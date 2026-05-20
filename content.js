@@ -1,3 +1,56 @@
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ナビパネル内でスクロール可能なコンテナを取得
+function getNavScrollable() {
+  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
+  if (navPanel.scrollHeight > navPanel.clientHeight + 10) return navPanel;
+  function find(el, depth) {
+    if (depth === 0) return null;
+    for (const child of el.children) {
+      const oy = getComputedStyle(child).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && child.scrollHeight > child.clientHeight + 10) {
+        return child;
+      }
+      const found = find(child, depth - 1);
+      if (found) return found;
+    }
+    return null;
+  }
+  return find(navPanel, 5) || navPanel;
+}
+
+// ナビパネルを上から下までスクロールして全カレンダーを収集し元の位置に戻す
+async function scrollAndCollectCalendars() {
+  const scrollEl = getNavScrollable();
+  const saved = scrollEl.scrollTop;
+  const collected = new Map();
+
+  const collect = () => {
+    for (const el of findCalendarElements()) {
+      const id = getCalendarId(el);
+      if (!id || collected.has(id)) continue;
+      const nameEl = el.querySelector('.toUqff');
+      if (!nameEl) continue;
+      const span = nameEl.querySelector('span[jsslot]');
+      const name = (span || nameEl).innerText.trim();
+      if (name) collected.set(id, { id, name });
+    }
+  };
+
+  scrollEl.scrollTop = 0;
+  await sleep(80);
+  collect();
+
+  while (scrollEl.scrollTop + scrollEl.clientHeight < scrollEl.scrollHeight - 5) {
+    scrollEl.scrollTop += 150;
+    await sleep(80);
+    collect();
+  }
+
+  scrollEl.scrollTop = saved;
+  return Array.from(collected.values());
+}
+
 // カレンダー要素を全件取得
 function findCalendarElements() {
   // ナビパネル内の div[data-id] のうちチェックボックスを含むものをすべて取得。
@@ -122,7 +175,7 @@ function cacheCurrentCalendars() {
 async function getAllCalendarsFromCacheAndDOM() {
   const cache = await getStoredCalendarCache();
   const map = new Map(Object.entries(cache));
-  for (const cal of getAllCalendars()) {
+  for (const cal of await scrollAndCollectCalendars()) {
     map.set(cal.id, cal);
   }
   const newCache = {};
@@ -137,13 +190,27 @@ function initCalendarCache() {
 
 let currentSelectedGroupName = null;
 
-// カレンダーをONにする。viewport外なら即座にスクロールしてクリック
-function setCalendarOn(id) {
-  const el = findCalendarItemById(id);
-  if (!el) {
-    console.log(`[GroupExt] calendar not in DOM: ${id}`);
-    return false;
+// 仮想スクロールでDOMから消えた要素をスクロールして探す
+async function scrollToReveal(id) {
+  const scrollEl = getNavScrollable();
+  const saved = scrollEl.scrollTop;
+  scrollEl.scrollTop = 0;
+  await sleep(50);
+  while (true) {
+    const el = findCalendarItemById(id);
+    if (el) return el;
+    if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5) break;
+    scrollEl.scrollTop += 150;
+    await sleep(50);
   }
+  scrollEl.scrollTop = saved;
+  return null;
+}
+
+// カレンダーをONにする
+async function setCalendarOn(id) {
+  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || checkbox.checked) return false;
   el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
@@ -151,13 +218,10 @@ function setCalendarOn(id) {
   return true;
 }
 
-// カレンダーをOFFにする。viewport外なら即座にスクロールしてクリック
-function setCalendarOff(id) {
-  const el = findCalendarItemById(id);
-  if (!el) {
-    console.log(`[GroupExt] calendar not in DOM: ${id}`);
-    return false;
-  }
+// カレンダーをOFFにする
+async function setCalendarOff(id) {
+  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || !checkbox.checked) return false;
   el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
@@ -172,23 +236,21 @@ function scrollBackToGroupSection() {
 }
 
 // グループをON: グループ外のONカレンダーをすべてOFFにしてからグループのみON
-function activateGroup(groupName, calendarIds) {
+async function activateGroup(groupName, calendarIds) {
   const groupIdSet = new Set(calendarIds);
 
-  // グループ外でONのカレンダーをすべてOFFにして記録
   const deactivated = [];
   for (const cal of getAllCalendars()) {
     if (!groupIdSet.has(cal.id) && isCalendarOn(cal.id)) {
-      setCalendarOff(cal.id);
+      await setCalendarOff(cal.id);
       deactivated.push(cal.id);
     }
   }
 
-  // グループ内で現在OFFのカレンダーをONにして記録
   const activated = [];
   for (const id of calendarIds) {
     if (!isCalendarOn(id)) {
-      setCalendarOn(id);
+      await setCalendarOn(id);
       activated.push(id);
     }
   }
@@ -209,15 +271,11 @@ function activateGroup(groupName, calendarIds) {
 
 // グループをOFF: グループON時の状態変更をすべて元に戻す
 function deactivateGroup() {
-  chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], (result) => {
+  chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
     const activated = result.activatedCalendarIds || [];
     const deactivated = result.deactivatedCalendarIds || [];
-    for (const id of activated) {
-      setCalendarOff(id);
-    }
-    for (const id of deactivated) {
-      setCalendarOn(id);
-    }
+    for (const id of activated) await setCalendarOff(id);
+    for (const id of deactivated) await setCalendarOn(id);
     currentSelectedGroupName = null;
     chrome.storage.local.remove(
       ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
