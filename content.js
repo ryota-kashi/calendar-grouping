@@ -1,6 +1,16 @@
 // カレンダー要素を全件取得
 function findCalendarElements() {
-  return Array.from(document.querySelectorAll('div[jscontroller="rHQf4"][data-id]'));
+  const byJscontroller = document.querySelectorAll('div[jscontroller="rHQf4"][data-id]');
+  const byDataCalid    = document.querySelectorAll('[data-calid]');
+  const byLiDataId     = document.querySelectorAll('li[data-id]');
+
+  console.log('[GroupExt] findCalendarElements — jscontroller:', byJscontroller.length,
+    '/ data-calid:', byDataCalid.length, '/ li[data-id]:', byLiDataId.length);
+
+  if (byJscontroller.length > 0) return Array.from(byJscontroller);
+  if (byDataCalid.length > 0)    return Array.from(byDataCalid);
+  if (byLiDataId.length > 0)     return Array.from(byLiDataId);
+  return [];
 }
 
 // カレンダー要素からIDを取得（複数フォールバックあり）
@@ -37,11 +47,13 @@ function getAllCalendars() {
   for (const el of findCalendarElements()) {
     const id = getCalendarId(el);
     const nameEl = el.querySelector('.toUqff');
-    if (!id || !nameEl) continue;
+    if (!id) { console.log('[GroupExt] id取得失敗:', el.outerHTML.slice(0, 200)); continue; }
+    if (!nameEl) { console.log('[GroupExt] .toUqff なし id:', id, el.outerHTML.slice(0, 200)); continue; }
     const span = nameEl.querySelector('span[jsslot]');
     const name = span ? span.innerText.trim() : nameEl.innerText.trim();
     if (name) calendars.push({ id, name });
   }
+  console.log('[GroupExt] getAllCalendars 結果:', calendars.length, '件', calendars.map(c => c.name));
   return calendars;
 }
 
