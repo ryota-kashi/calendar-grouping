@@ -190,3 +190,142 @@ function deactivateGroup() {
     });
   });
 }
+
+// Google Calendar サイドバーにグループセクションを注入
+function insertGroupSection() {
+  if (document.querySelector('#custom-group-section')) return;
+
+  let targetH2 = null;
+  let sectionName = 'カレンダーグループ';
+
+  for (const h2 of document.querySelectorAll('h2.XuJrye')) {
+    const text = h2.textContent.trim();
+    if (text === 'カレンダー リスト') {
+      targetH2 = h2;
+    } else if (text === 'Calendar list') {
+      targetH2 = h2;
+      sectionName = 'Calendar groups';
+    }
+  }
+
+  if (!targetH2) {
+    console.error('[GroupExt] カレンダー リスト の h2 が見つかりません');
+    return;
+  }
+
+  const section = document.createElement('div');
+  section.id = 'custom-group-section';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.classList.add('custom-nUt0vb', 'custom-uQ1ixe');
+  btn.setAttribute('aria-expanded', 'true');
+  btn.innerHTML = `
+    <div class="GsuJoe"></div>
+    <div class="x5FT4e kkUTBb">
+      <div class="o8t45d">
+        <div class="aIwHYe">${sectionName}</div>
+        <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true">keyboard_arrow_up</i>
+      </div>
+    </div>
+  `;
+
+  const container = document.createElement('div');
+  container.id = 'group-list-container';
+  container.setAttribute('role', 'list');
+  container.setAttribute('aria-expanded', 'true');
+
+  const list = document.createElement('ul');
+  list.id = 'group-list';
+  container.appendChild(list);
+
+  btn.addEventListener('click', () => {
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!expanded));
+    container.setAttribute('aria-expanded', String(!expanded));
+    btn.querySelector('i').textContent = expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_up';
+    container.style.display = expanded ? 'none' : 'block';
+  });
+
+  section.appendChild(btn);
+  section.appendChild(container);
+  targetH2.insertAdjacentElement('afterend', section);
+
+  loadGroupsToPage();
+}
+
+// グループ一覧をサイドバーに描画
+function loadGroupsToPage() {
+  getStoredGroups().then((groups) => {
+    const list = document.getElementById('group-list');
+    if (!list) return;
+
+    list.style.visibility = 'hidden';
+    list.innerHTML = '';
+
+    for (const groupName of Object.keys(groups)) {
+      const color = getRandomColorForGroup(groupName);
+      const isActive = groupName === currentSelectedGroupName;
+
+      const item = document.createElement('div');
+      item.style.cssText = 'display:flex;align-items:center;transition:background-color 0.3s ease;margin-right:4px;cursor:pointer;';
+
+      item.addEventListener('mouseenter', () => {
+        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = '#f0f0f0';
+      });
+      item.addEventListener('mouseleave', () => {
+        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = 'transparent';
+      });
+
+      // Google Calendar のスタイルに合わせたチェックボックス構造
+      const checkboxDiv = document.createElement('div');
+      checkboxDiv.classList.add('zZj8Pb', 'EaVNbc');
+      checkboxDiv.style.marginRight = '-10px';
+
+      const checkboxWrapper = document.createElement('div');
+      checkboxWrapper.classList.add('lcPUt');
+
+      const checkboxContainer = document.createElement('div');
+      checkboxContainer.classList.add('VfPpkd-MPu53c', 'Ne8lhe', 'swXlm', 'az2ine', 'iIJNvc', 'd7WT8c');
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.classList.add('VfPpkd-muHVFf-bMcfAe');
+      checkbox.checked = isActive;
+
+      const checkboxIcon = document.createElement('div');
+      checkboxIcon.classList.add('VfPpkd-YQoJzd');
+      checkboxIcon.style.borderColor = color;
+      if (isActive) checkboxIcon.style.backgroundColor = color;
+      checkboxIcon.innerHTML = `
+        <svg aria-hidden="true" class="VfPpkd-HUofsb" viewBox="0 0 24 24">
+          <path class="VfPpkd-HUofsb-Jt5cK" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" stroke="white" stroke-width="2"></path>
+        </svg>
+        <div class="VfPpkd-SJnn3d"></div>
+      `;
+
+      checkboxContainer.appendChild(checkbox);
+      checkboxContainer.appendChild(checkboxIcon);
+      checkboxWrapper.appendChild(checkboxContainer);
+      checkboxDiv.appendChild(checkboxWrapper);
+
+      const span = document.createElement('span');
+      span.classList.add('toUqff', 'qZvm2d-ibnC6b-bN97Pc', 'HRaT6d');
+      span.textContent = groupName;
+
+      item.appendChild(checkboxDiv);
+      item.appendChild(span);
+      list.appendChild(item);
+
+      item.addEventListener('click', () => {
+        if (currentSelectedGroupName === groupName) {
+          deactivateGroup();
+        } else {
+          activateGroup(groupName, groups[groupName].map((c) => c.id));
+        }
+      });
+    }
+
+    list.style.visibility = 'visible';
+  });
+}
