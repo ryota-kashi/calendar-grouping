@@ -329,3 +329,70 @@ function loadGroupsToPage() {
     list.style.visibility = 'visible';
   });
 }
+
+// ナビパネルを監視してグループセクションが消えたら再注入
+function observeNavPanel() {
+  const target =
+    document.querySelector('.hEtGGf.HDIIVe.sBn5T[jscontroller="TKuTKe"]') ||
+    document.body;
+
+  new MutationObserver(() => {
+    if (!document.querySelector('#custom-group-section')) {
+      insertGroupSection();
+    }
+  }).observe(target, { childList: true, subtree: true });
+
+  insertGroupSection();
+}
+
+// ストレージからグループ選択状態を復元して再適用
+function getCurrentSelectedGroup() {
+  chrome.storage.local.get('currentSelectedGroup', (result) => {
+    currentSelectedGroupName = result.currentSelectedGroup || null;
+    if (currentSelectedGroupName) {
+      getStoredGroups().then((groups) => {
+        const group = groups[currentSelectedGroupName];
+        if (group) {
+          activateGroup(currentSelectedGroupName, group.map((c) => c.id));
+        } else {
+          currentSelectedGroupName = null;
+          loadGroupsToPage();
+        }
+      });
+    } else {
+      loadGroupsToPage();
+    }
+  });
+}
+
+// popup.js からのメッセージを受け取る
+function setMessageListener() {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'getCalendars') {
+      getAllCalendarsFromCacheAndDOM().then((calendars) => sendResponse({ calendars }));
+    } else if (message.action === 'activateGroup') {
+      activateGroup(message.groupName, message.calendarIds);
+      sendResponse({ success: true });
+    } else if (message.action === 'deactivateGroup') {
+      deactivateGroup();
+      sendResponse({ success: true });
+    } else if (message.action === 'refreshGroupList') {
+      loadGroupsToPage();
+      sendResponse({ success: true });
+    } else if (message.action === 'clearCache') {
+      clearCalendarCache().then(() => sendResponse({ success: true }));
+    } else {
+      sendResponse({ success: false });
+    }
+    return true;
+  });
+}
+
+function initialize() {
+  getCurrentSelectedGroup();
+  observeNavPanel();
+  setMessageListener();
+  initCalendarCache();
+}
+
+initialize();
