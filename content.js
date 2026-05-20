@@ -392,7 +392,9 @@ function getCurrentSelectedGroup() {
 // popup.js からのメッセージを受け取る
 function setMessageListener() {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'getCalendars') {
+    if (message.action === 'ping') {
+      sendResponse({ pong: true });
+    } else if (message.action === 'getCalendars') {
       getAllCalendarsFromCacheAndDOM().then((calendars) => sendResponse({ calendars }));
     } else if (message.action === 'activateGroup') {
       activateGroup(message.groupName, message.calendarIds);
