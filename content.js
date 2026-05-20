@@ -1,16 +1,18 @@
 // カレンダー要素を全件取得
 function findCalendarElements() {
-  const byJscontroller = document.querySelectorAll('div[jscontroller="rHQf4"][data-id]');
-  const byDataCalid    = document.querySelectorAll('[data-calid]');
-  const byLiDataId     = document.querySelectorAll('li[data-id]');
+  // ナビパネル内の div[data-id] のうちチェックボックスを含むものをすべて取得。
+  // jscontroller 値はセクション（マイ/その他）によって異なるため使用しない。
+  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
+  const candidates = navPanel.querySelectorAll('div[data-id]');
+  const results = Array.from(candidates).filter(
+    el => el.querySelector('input[type="checkbox"]')
+  );
+  if (results.length > 0) return results;
 
-  console.log('[GroupExt] findCalendarElements — jscontroller:', byJscontroller.length,
-    '/ data-calid:', byDataCalid.length, '/ li[data-id]:', byLiDataId.length);
-
-  if (byJscontroller.length > 0) return Array.from(byJscontroller);
-  if (byDataCalid.length > 0)    return Array.from(byDataCalid);
-  if (byLiDataId.length > 0)     return Array.from(byLiDataId);
-  return [];
+  // フォールバック: ページ全体から探す
+  return Array.from(document.querySelectorAll('div[data-id]')).filter(
+    el => el.querySelector('input[type="checkbox"]')
+  );
 }
 
 // カレンダー要素からIDを取得（複数フォールバックあり）
@@ -61,7 +63,7 @@ function getAllCalendars() {
 function isCalendarOn(id) {
   const el = findCalendarItemById(id);
   if (!el) return false;
-  const checkbox = el.querySelector('input[type="checkbox"][jsname="YPqjbf"]');
+  const checkbox = el.querySelector('input[type="checkbox"]');
   return checkbox ? checkbox.checked : false;
 }
 
@@ -142,7 +144,7 @@ function setCalendarOn(id) {
     console.log(`[GroupExt] calendar not in DOM: ${id}`);
     return false;
   }
-  const checkbox = el.querySelector('input[type="checkbox"][jsname="YPqjbf"]');
+  const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || checkbox.checked) return false;
   el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
@@ -156,7 +158,7 @@ function setCalendarOff(id) {
     console.log(`[GroupExt] calendar not in DOM: ${id}`);
     return false;
   }
-  const checkbox = el.querySelector('input[type="checkbox"][jsname="YPqjbf"]');
+  const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || !checkbox.checked) return false;
   el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
