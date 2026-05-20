@@ -1,0 +1,184 @@
+let currentSelectedGroup = null;
+
+document.addEventListener('DOMContentLoaded', initialize);
+
+function initialize() {
+  loadCalendars();
+  loadGroups();
+  setAddGroupButtonListener();
+  setEditButtonListeners();
+  setClearCacheButtonListener();
+  restoreSelectedGroup();
+}
+
+// content script に 1 回だけカレンダー一覧を問い合わせる
+function loadCalendars() {
+  return getCalendarsFromContentScript()
+    .then(displayCalendarList)
+    .catch((err) => {
+      console.error(err);
+      alert('カレンダーの情報を取得できませんでした。Googleカレンダーのページが完全にロードされてから、再度お試しください。');
+    });
+}
+
+function getCalendarsFromContentScript() {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs.length) return reject('タブが見つかりません');
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'getCalendars' }, (response) => {
+        if (chrome.runtime.lastError || !response?.calendars) {
+          return reject(chrome.runtime.lastError?.message || 'No response');
+        }
+        resolve(response.calendars);
+      });
+    });
+  });
+}
+
+function displayCalendarList(calendars) {
+  const div = document.getElementById('calendarList');
+  div.innerHTML = '';
+  if (!calendars.length) {
+    div.textContent = 'カレンダーが見つかりませんでした。';
+    return;
+  }
+  for (const cal of calendars) {
+    addCalendarItem(cal, div);
+  }
+}
+
+function addCalendarItem(calendar, container) {
+  const label = document.createElement('label');
+  label.classList.add('calendar-item');
+  label.dataset.id = calendar.id;
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.value = calendar.id;
+
+  const span = document.createElement('span');
+  span.textContent = calendar.name;
+
+  label.appendChild(checkbox);
+  label.appendChild(span);
+  container.appendChild(label);
+}
+
+function getStoredGroups() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get('calendarGroups', (result) => {
+      resolve(result.calendarGroups || {});
+    });
+  });
+}
+
+function saveGroups(groups) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ calendarGroups: groups }, resolve);
+  });
+}
+
+function loadGroups() {
+  getStoredGroups().then((groups) => {
+    const list = document.getElementById('groupList');
+    list.innerHTML = '';
+    const section = document.getElementById('groupSection');
+
+    if (!Object.keys(groups).length) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+    for (const name of Object.keys(groups)) {
+      addGroupItem(name);
+    }
+    updateGroupSelection();
+  });
+}
+
+function addGroupItem(groupName) {
+  const list = document.getElementById('groupList');
+
+  const div = document.createElement('div');
+  div.classList.add('group-item');
+  div.dataset.name = groupName;
+
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = groupName;
+  nameSpan.classList.add('group-name');
+  if (currentSelectedGroup === groupName) nameSpan.classList.add('selected');
+  nameSpan.addEventListener('click', () => toggleGroup(groupName));
+
+  const editBtn = document.createElement('button');
+  editBtn.classList.add('edit-button');
+  editBtn.innerHTML = '<span class="material-icons">edit</span>';
+  editBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditingGroup(groupName); });
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.innerHTML = '<i class="material-icons">delete</i>';
+  deleteBtn.classList.add('delete-button');
+  deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteGroup(groupName); });
+
+  div.appendChild(nameSpan);
+  div.appendChild(editBtn);
+  div.appendChild(deleteBtn);
+  list.appendChild(div);
+}
+
+function updateGroupSelection() {
+  document.querySelectorAll('.group-name').forEach((el) => {
+    el.classList.toggle('selected', el.textContent === currentSelectedGroup);
+  });
+}
+
+function restoreSelectedGroup() {
+  chrome.storage.local.get('currentSelectedGroup', (result) => {
+    currentSelectedGroup = result.currentSelectedGroup || null;
+    updateGroupSelection();
+  });
+}
+
+function setAddGroupButtonListener() {
+  document.getElementById('addGroupBtn').addEventListener('click', createGroup);
+}
+
+function setEditButtonListeners() {
+  document.getElementById('updateGroupBtn').addEventListener('click', updateGroup);
+  document.getElementById('cancelEditBtn').addEventListener('click', cancelEditing);
+}
+
+function setClearCacheButtonListener() {
+  document.getElementById('clearCacheBtn').addEventListener('click', () => {
+    if (!confirm('カレンダーキャッシュをクリアしますか？')) return;
+    sendToContentScript({ action: 'clearCache' })
+      .then(() => { loadCalendars(); alert('キャッシュをクリアしました。'); })
+      .catch(() => alert('キャッシュのクリアに失敗しました。'));
+  });
+}
+
+function sendToContentScript(message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs.length) return reject('タブが見つかりません');
+      chrome.tabs.sendMessage(tabs[0].id, message, (response) => {
+        if (chrome.runtime.lastError || !response?.success) {
+          return reject(chrome.runtime.lastError?.message || 'Failed');
+        }
+        resolve(response);
+      });
+    });
+  });
+}
+
+function notifyContentScript() {
+  sendToContentScript({ action: 'refreshGroupList' }).catch(console.error);
+}
+
+function getSelectedCalendarsFrom(containerId) {
+  const selected = [];
+  document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`).forEach((cb) => {
+    selected.push({ id: cb.value, name: cb.nextSibling.textContent });
+  });
+  return selected;
+}
