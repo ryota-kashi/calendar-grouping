@@ -7,30 +7,59 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-  <div id="groupSection" style="display:none;">
-    <h3>グループ一覧</h3>
+
+  <header class="app-header">
+    <div class="header-icon">
+      <span class="material-icons">layers</span>
+    </div>
+    <h1>カレンダーグループ</h1>
+  </header>
+
+  <!-- グループ一覧 -->
+  <div id="groupSection" style="display:none;" class="section">
+    <div class="section-title">グループ一覧</div>
     <div id="groupList"></div>
   </div>
 
-  <div id="editGroupSection" style="display:none;">
-    <h3>グループを編集</h3>
-    <input type="text" id="editGroupNameInput" placeholder="グループ名を入力">
-    <div id="editCalendarList"></div>
-    <button id="updateGroupBtn">更新</button>
-    <button id="cancelEditBtn">キャンセル</button>
+  <!-- グループ編集 -->
+  <div id="editGroupSection" style="display:none;" class="section form-section">
+    <div class="section-title">グループを編集</div>
+    <div class="form-group">
+      <label class="form-label">グループ名</label>
+      <input type="text" id="editGroupNameInput" placeholder="グループ名を入力">
+    </div>
+    <div class="form-group">
+      <label class="form-label">カレンダー</label>
+      <div class="calendar-scroll" id="editCalendarList"></div>
+    </div>
+    <div class="btn-row">
+      <button id="updateGroupBtn" class="btn btn-primary">
+        <span class="material-icons">check</span>更新
+      </button>
+      <button id="cancelEditBtn" class="btn btn-secondary">キャンセル</button>
+    </div>
   </div>
 
-  <div id="createGroupSection">
-    <h3>新しいグループを作成</h3>
-    <input type="text" id="groupNameInput" placeholder="グループ名を入力">
-    <div id="calendarList"></div>
-    <button id="addGroupBtn">グループを作成</button>
+  <!-- グループ作成 -->
+  <div id="createGroupSection" class="section form-section">
+    <div class="section-title">新しいグループを作成</div>
+    <div class="form-group">
+      <label class="form-label">グループ名</label>
+      <input type="text" id="groupNameInput" placeholder="例: 採用チーム">
+    </div>
+    <div class="form-group">
+      <label class="form-label">カレンダーを選択</label>
+      <div class="calendar-scroll" id="calendarList"></div>
+    </div>
+    <button id="addGroupBtn" class="btn btn-primary">
+      <span class="material-icons">add</span>グループを作成
+    </button>
   </div>
 
+  <!-- 設定 -->
   <div id="cacheSection">
-    <h3>設定</h3>
     <button id="clearCacheBtn" class="settings-btn">
-      <span class="material-icons">clear_all</span>
+      <span class="material-icons">delete_sweep</span>
       カレンダーキャッシュをクリア
     </button>
   </div>

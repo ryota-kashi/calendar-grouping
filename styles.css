@@ -1,115 +1,292 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  width: 300px;
-  padding: 10px;
-  font-family: 'Google Sans', sans-serif;
-  font-size: 14px;
+  width: 320px;
+  background: #f8f9fa;
+  font-family: 'Google Sans', 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: #202124;
 }
 
-h3 {
-  margin: 8px 0;
-  font-size: 14px;
-  color: #333;
+/* ヘッダー */
+.app-header {
+  background: #1e2d40;
+  color: white;
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-input[type="text"] {
-  width: 100%;
-  padding: 6px;
-  margin-bottom: 8px;
-  box-sizing: border-box;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+.app-header .header-icon {
+  width: 28px;
+  height: 28px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-button {
-  padding: 6px 12px;
-  margin-right: 4px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  background: #4285F4;
+.app-header .header-icon .material-icons {
+  font-size: 16px;
   color: white;
 }
 
-button:hover { background: #3367D6; }
+.app-header h1 {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
 
-.settings-btn {
+/* セクション共通 */
+.section {
+  padding: 14px 14px 10px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+}
+
+/* グループ一覧 */
+#groupSection {
+  border-bottom: 1px solid #e8eaed;
+}
+
+#groupList {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 4px;
-  background: #f1f3f4;
-  color: #333;
+  max-height: 180px;
+  overflow-y: auto;
 }
-
-.settings-btn:hover { background: #e0e0e0; }
-
-#cancelEditBtn { background: #e0e0e0; color: #333; }
-#cancelEditBtn:hover { background: #ccc; }
-
-.calendar-item {
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  cursor: pointer;
-}
-
-.calendar-item:hover { background: #f1f3f4; }
-
-.calendar-item input { margin-right: 8px; }
 
 .group-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: white;
+  border: 1px solid #e8eaed;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  gap: 8px;
 }
 
-.group-item:hover { background: #f1f3f4; }
+.group-item:hover {
+  border-color: #c5cae9;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.group-item.active {
+  background: #e8f0fe;
+  border-color: #4285F4;
+}
+
+.group-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 .group-name {
   flex: 1;
+  font-weight: 500;
+  color: #202124;
   cursor: pointer;
-  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.group-name.selected { font-weight: bold; color: #4285F4; }
+.group-name.selected { color: #4285F4; }
 
-.edit-button, .delete-button {
+.group-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.group-item:hover .group-actions { opacity: 1; }
+
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
   background: transparent;
-  color: #666;
-  padding: 2px 4px;
+  color: #5f6368;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  padding: 0;
 }
 
-.edit-button:hover, .delete-button:hover {
-  background: #e0e0e0;
-  color: #333;
+.icon-btn .material-icons { font-size: 15px; }
+.icon-btn:hover { background: #f1f3f4; color: #202124; }
+.icon-btn.delete:hover { background: #fce8e6; color: #d93025; }
+
+/* フォーム共通 */
+.form-section {
+  border-bottom: 1px solid #e8eaed;
 }
 
-#groupSection, #cacheSection { margin-bottom: 12px; }
+.form-group {
+  margin-bottom: 10px;
+}
 
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6368;
+  margin-bottom: 5px;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #202124;
+  background: white;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: #4285F4;
+  box-shadow: 0 0 0 3px rgba(66,133,244,0.15);
+}
+
+/* カレンダーリスト */
+.calendar-scroll {
+  max-height: 150px;
+  overflow-y: auto;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background: white;
+}
+
+.calendar-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 8px;
+}
+
+.calendar-item:not(:last-child) { border-bottom: 1px solid #f1f3f4; }
+.calendar-item:hover { background: #f8f9fa; }
+
+.calendar-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #4285F4;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.calendar-item span { font-size: 13px; color: #202124; }
+
+/* ボタン */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.btn-primary {
+  background: #4285F4;
+  color: white;
+  width: 100%;
+  justify-content: center;
+}
+
+.btn-primary:hover { background: #3367D6; box-shadow: 0 2px 6px rgba(66,133,244,0.35); }
+
+.btn-secondary {
+  background: #f1f3f4;
+  color: #202124;
+}
+
+.btn-secondary:hover { background: #e8eaed; }
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-row .btn { flex: 1; justify-content: center; }
+
+.btn .material-icons { font-size: 15px; }
+
+/* 設定セクション */
+#cacheSection { padding: 12px 14px; }
+
+.settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  color: #5f6368;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-btn:hover { background: #fce8e6; border-color: #f28b82; color: #d93025; }
+.settings-btn .material-icons { font-size: 16px; }
+
+/* スクロールバー */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 4px; }
+
+/* トースト */
 #toast {
   position: fixed;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%) translateY(20px);
-  background: #323232;
+  background: #1e2d40;
   color: white;
   padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 8px;
+  font-size: 12px;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
 }
 
 #toast.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
-}
-
-#groupList, #calendarList, #editCalendarList {
-  max-height: 200px;
-  overflow-y: auto;
-  margin-bottom: 8px;
 }

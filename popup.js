@@ -1,5 +1,20 @@
 let currentSelectedGroup = null;
 
+const COLOR_PALETTE = [
+  '#AD1457', '#F4511E', '#E4C441', '#0B8043', '#3F51B5',
+  '#8E24AA', '#D81B60', '#EF6C00', '#C0CA33', '#009688',
+  '#7986CB', '#795548', '#D50000', '#F09300', '#7CB342',
+  '#33B679', '#4285F4', '#9E69AF', '#A79B8E', '#616161',
+  '#E67C73', '#F6BF26',
+];
+const groupColors = {};
+function getColorForGroup(name) {
+  if (!groupColors[name]) {
+    groupColors[name] = COLOR_PALETTE[Object.keys(groupColors).length % COLOR_PALETTE.length];
+  }
+  return groupColors[name];
+}
+
 document.addEventListener('DOMContentLoaded', initialize);
 
 function initialize() {
@@ -102,7 +117,12 @@ function addGroupItem(groupName) {
 
   const div = document.createElement('div');
   div.classList.add('group-item');
+  if (currentSelectedGroup === groupName) div.classList.add('active');
   div.dataset.name = groupName;
+
+  const dot = document.createElement('div');
+  dot.classList.add('group-color-dot');
+  dot.style.background = getColorForGroup(groupName);
 
   const nameSpan = document.createElement('span');
   nameSpan.textContent = groupName;
@@ -110,25 +130,33 @@ function addGroupItem(groupName) {
   if (currentSelectedGroup === groupName) nameSpan.classList.add('selected');
   nameSpan.addEventListener('click', () => toggleGroup(groupName));
 
+  const actions = document.createElement('div');
+  actions.classList.add('group-actions');
+
   const editBtn = document.createElement('button');
-  editBtn.classList.add('edit-button');
+  editBtn.classList.add('icon-btn');
   editBtn.innerHTML = '<span class="material-icons">edit</span>';
   editBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditingGroup(groupName); });
 
   const deleteBtn = document.createElement('button');
-  deleteBtn.innerHTML = '<i class="material-icons">delete</i>';
-  deleteBtn.classList.add('delete-button');
+  deleteBtn.classList.add('icon-btn', 'delete');
+  deleteBtn.innerHTML = '<span class="material-icons">delete</span>';
   deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteGroup(groupName); });
 
+  actions.appendChild(editBtn);
+  actions.appendChild(deleteBtn);
+
+  div.appendChild(dot);
   div.appendChild(nameSpan);
-  div.appendChild(editBtn);
-  div.appendChild(deleteBtn);
+  div.appendChild(actions);
   list.appendChild(div);
 }
 
 function updateGroupSelection() {
-  document.querySelectorAll('.group-name').forEach((el) => {
-    el.classList.toggle('selected', el.textContent === currentSelectedGroup);
+  document.querySelectorAll('.group-item').forEach((item) => {
+    const isSelected = item.dataset.name === currentSelectedGroup;
+    item.classList.toggle('active', isSelected);
+    item.querySelector('.group-name').classList.toggle('selected', isSelected);
   });
 }
 
