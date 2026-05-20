@@ -120,3 +120,73 @@ async function getAllCalendarsFromCacheAndDOM() {
 function initCalendarCache() {
   setTimeout(cacheCurrentCalendars, 2000);
 }
+
+let currentSelectedGroupName = null;
+
+// カレンダーをONにする。viewport外なら即座にスクロールしてクリック
+function setCalendarOn(id) {
+  const el = findCalendarItemById(id);
+  if (!el) {
+    console.log(`[GroupExt] calendar not in DOM: ${id}`);
+    return false;
+  }
+  const checkbox = el.querySelector('input[type="checkbox"][jsname="YPqjbf"]');
+  if (!checkbox || checkbox.checked) return false;
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  checkbox.click();
+  return true;
+}
+
+// カレンダーをOFFにする。viewport外なら即座にスクロールしてクリック
+function setCalendarOff(id) {
+  const el = findCalendarItemById(id);
+  if (!el) {
+    console.log(`[GroupExt] calendar not in DOM: ${id}`);
+    return false;
+  }
+  const checkbox = el.querySelector('input[type="checkbox"][jsname="YPqjbf"]');
+  if (!checkbox || !checkbox.checked) return false;
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  checkbox.click();
+  return true;
+}
+
+// 全カレンダー操作後にグループセクションまでスムーズスクロールで戻る
+function scrollBackToGroupSection() {
+  const section = document.querySelector('#custom-group-section');
+  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// グループをON: 現在OFFのカレンダーだけONにして activatedCalendarIds に記録
+function activateGroup(groupName, calendarIds) {
+  const activated = [];
+  for (const id of calendarIds) {
+    if (!isCalendarOn(id)) {
+      setCalendarOn(id);
+      activated.push(id);
+    }
+  }
+  currentSelectedGroupName = groupName;
+  chrome.storage.local.set(
+    { currentSelectedGroup: groupName, activatedCalendarIds: activated },
+    () => {
+      scrollBackToGroupSection();
+      loadGroupsToPage();
+    }
+  );
+}
+
+// グループをOFF: activatedCalendarIds のカレンダーだけOFFに戻す
+function deactivateGroup() {
+  chrome.storage.local.get('activatedCalendarIds', (result) => {
+    const ids = result.activatedCalendarIds || [];
+    for (const id of ids) {
+      setCalendarOff(id);
+    }
+    currentSelectedGroupName = null;
+    chrome.storage.local.remove(['currentSelectedGroup', 'activatedCalendarIds'], () => {
+      scrollBackToGroupSection();
+      loadGroupsToPage();
+    });
+  });
+}
