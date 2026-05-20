@@ -55,18 +55,38 @@ function findCalendarTab() {
   });
 }
 
+function sendMessage(tabId, message) {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError || !response) {
+        return reject(new Error('no_response'));
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function injectContentScript(tabId) {
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+  await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
+  await new Promise((r) => setTimeout(r, 800));
+}
+
 async function getCalendarsFromContentScript() {
   const tabId = await findCalendarTab();
   if (tabId === null) throw new Error('no_tab');
 
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, { action: 'getCalendars' }, (response) => {
-      if (chrome.runtime.lastError || !response?.calendars) {
-        return reject(new Error('no_response'));
-      }
-      resolve(response.calendars);
-    });
-  });
+  // 通信を試み、失敗したらcontent scriptを注入して1回リトライ
+  try {
+    const res = await sendMessage(tabId, { action: 'getCalendars' });
+    if (!res.calendars) throw new Error('no_response');
+    return res.calendars;
+  } catch {
+    await injectContentScript(tabId);
+    const res = await sendMessage(tabId, { action: 'getCalendars' });
+    if (!res.calendars) throw new Error('no_response');
+    return res.calendars;
+  }
 }
 
 function displayCalendarList(calendars) {
@@ -207,14 +227,12 @@ function setClearCacheButtonListener() {
 async function sendToContentScript(message) {
   const tabId = await findCalendarTab();
   if (tabId === null) throw new Error('no_tab');
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      if (chrome.runtime.lastError || !response?.success) {
-        return reject(new Error(chrome.runtime.lastError?.message || 'Failed'));
-      }
-      resolve(response);
-    });
-  });
+  try {
+    return await sendMessage(tabId, message);
+  } catch {
+    await injectContentScript(tabId);
+    return await sendMessage(tabId, message);
+  }
 }
 
 function notifyContentScript() {
