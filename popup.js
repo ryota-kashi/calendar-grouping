@@ -28,19 +28,50 @@ function initialize() {
 
 // content script に 1 回だけカレンダー一覧を問い合わせる
 function loadCalendars() {
+  const listEl = document.getElementById('calendarList');
+  listEl.innerHTML = '<div style="padding:10px;color:#5f6368;font-size:12px;">読み込み中...</div>';
+
   return getCalendarsFromContentScript()
     .then(displayCalendarList)
     .catch((err) => {
       console.error(err);
-      alert('カレンダーの情報を取得できませんでした。Googleカレンダーのページが完全にロードされてから、再度お試しください。');
+      listEl.innerHTML = '<div style="padding:10px;color:#d93025;font-size:12px;">取得に失敗しました。再度お試しください。</div>';
     });
 }
 
+// GoogleカレンダーのタブIDを取得する。存在しない場合は新しいタブで開いて待つ
+function getCalendarTabId() {
+  return new Promise((resolve) => {
+    chrome.tabs.query({ url: 'https://calendar.google.com/*' }, (tabs) => {
+      if (tabs.length > 0) {
+        resolve(tabs[0].id);
+        return;
+      }
+
+      // Googleカレンダーが開いていない場合は新しいタブで開く
+      const listEl = document.getElementById('calendarList');
+      if (listEl) {
+        listEl.innerHTML = '<div style="padding:10px;color:#5f6368;font-size:12px;">Googleカレンダーを開いています...</div>';
+      }
+
+      chrome.tabs.create({ url: 'https://calendar.google.com/', active: true }, (newTab) => {
+        const listener = (tabId, changeInfo) => {
+          if (tabId === newTab.id && changeInfo.status === 'complete') {
+            chrome.tabs.onUpdated.removeListener(listener);
+            // content scriptの初期化を待つ
+            setTimeout(() => resolve(newTab.id), 2000);
+          }
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+      });
+    });
+  });
+}
+
 function getCalendarsFromContentScript() {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs.length) return reject('タブが見つかりません');
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'getCalendars' }, (response) => {
+  return getCalendarTabId().then((tabId) => {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, { action: 'getCalendars' }, (response) => {
         if (chrome.runtime.lastError || !response?.calendars) {
           return reject(chrome.runtime.lastError?.message || 'No response');
         }
@@ -186,10 +217,9 @@ function setClearCacheButtonListener() {
 }
 
 function sendToContentScript(message) {
-  return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs.length) return reject('タブが見つかりません');
-      chrome.tabs.sendMessage(tabs[0].id, message, (response) => {
+  return getCalendarTabId().then((tabId) => {
+    return new Promise((resolve, reject) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
         if (chrome.runtime.lastError || !response?.success) {
           return reject(chrome.runtime.lastError?.message || 'Failed');
         }
