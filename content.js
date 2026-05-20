@@ -1,5 +1,9 @@
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+function isChromeContextValid() {
+  try { return !!chrome.runtime.id; } catch { return false; }
+}
+
 // ナビパネル内でスクロール可能なコンテナを取得
 function getNavScrollable() {
   const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
@@ -139,27 +143,37 @@ function getRandomColorForGroup(groupName) {
 
 function getStoredGroups() {
   return new Promise((resolve) => {
-    chrome.storage.local.get('calendarGroups', (result) => {
-      resolve(result.calendarGroups || {});
-    });
+    if (!isChromeContextValid()) { resolve({}); return; }
+    try {
+      chrome.storage.local.get('calendarGroups', (result) => {
+        resolve(result.calendarGroups || {});
+      });
+    } catch { resolve({}); }
   });
 }
 
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
-    chrome.storage.local.get('calendarCache', (result) => {
-      resolve(result.calendarCache || {});
-    });
+    if (!isChromeContextValid()) { resolve({}); return; }
+    try {
+      chrome.storage.local.get('calendarCache', (result) => {
+        resolve(result.calendarCache || {});
+      });
+    } catch { resolve({}); }
   });
 }
 
 function clearCalendarCache() {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ calendarCache: {} }, resolve);
+    if (!isChromeContextValid()) { resolve(); return; }
+    try {
+      chrome.storage.local.set({ calendarCache: {} }, resolve);
+    } catch { resolve(); }
   });
 }
 
 function cacheCurrentCalendars() {
+  if (!isChromeContextValid()) return;
   getStoredCalendarCache().then((cache) => {
     let updated = false;
     for (const cal of getAllCalendars()) {
@@ -168,7 +182,9 @@ function cacheCurrentCalendars() {
         updated = true;
       }
     }
-    if (updated) chrome.storage.local.set({ calendarCache: cache });
+    if (updated) {
+      try { chrome.storage.local.set({ calendarCache: cache }); } catch { /* invalidated */ }
+    }
   });
 }
 
@@ -180,7 +196,7 @@ async function getAllCalendarsFromCacheAndDOM() {
   }
   const newCache = {};
   map.forEach((v, k) => { newCache[k] = v; });
-  chrome.storage.local.set({ calendarCache: newCache });
+  try { chrome.storage.local.set({ calendarCache: newCache }); } catch { /* invalidated */ }
   return Array.from(map.values());
 }
 
@@ -195,13 +211,13 @@ async function scrollToReveal(id) {
   const scrollEl = getNavScrollable();
   const saved = scrollEl.scrollTop;
   scrollEl.scrollTop = 0;
-  await sleep(50);
+  await sleep(150);
   while (true) {
     const el = findCalendarItemById(id);
     if (el) return el;
     if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5) break;
     scrollEl.scrollTop += 150;
-    await sleep(50);
+    await sleep(150);
   }
   scrollEl.scrollTop = saved;
   return null;
@@ -209,23 +225,32 @@ async function scrollToReveal(id) {
 
 // カレンダーをONにする
 async function setCalendarOn(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
   if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  // scrollIntoView後に再取得（仮想スクロールで参照が古くなる可能性があるため）
+  el = findCalendarItemById(id);
+  if (!el) { console.log(`[GroupExt] calendar disappeared after scroll: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || checkbox.checked) return false;
-  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
+  await sleep(80);
   return true;
 }
 
 // カレンダーをOFFにする
 async function setCalendarOff(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
   if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  el = findCalendarItemById(id);
+  if (!el) { console.log(`[GroupExt] calendar disappeared after scroll: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || !checkbox.checked) return false;
-  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
+  await sleep(80);
   return true;
 }
 
@@ -239,8 +264,9 @@ function scrollBackToGroupSection() {
 async function activateGroup(groupName, calendarIds) {
   const groupIdSet = new Set(calendarIds);
 
+  // スクロールして全カレンダーを収集してから非活性化（仮想スクロール対応）
   const deactivated = [];
-  for (const cal of getAllCalendars()) {
+  for (const cal of await scrollAndCollectCalendars()) {
     if (!groupIdSet.has(cal.id) && isCalendarOn(cal.id)) {
       await setCalendarOff(cal.id);
       deactivated.push(cal.id);
@@ -256,35 +282,44 @@ async function activateGroup(groupName, calendarIds) {
   }
 
   currentSelectedGroupName = groupName;
-  chrome.storage.local.set(
-    {
-      currentSelectedGroup: groupName,
-      activatedCalendarIds: activated,
-      deactivatedCalendarIds: deactivated,
-    },
-    () => {
-      scrollBackToGroupSection();
-      loadGroupsToPage();
-    }
-  );
-}
-
-// グループをOFF: グループON時の状態変更をすべて元に戻す
-function deactivateGroup() {
-  chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
-    const activated = result.activatedCalendarIds || [];
-    const deactivated = result.deactivatedCalendarIds || [];
-    for (const id of activated) await setCalendarOff(id);
-    for (const id of deactivated) await setCalendarOn(id);
-    currentSelectedGroupName = null;
-    chrome.storage.local.remove(
-      ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
+  if (!isChromeContextValid()) return;
+  try {
+    chrome.storage.local.set(
+      {
+        currentSelectedGroup: groupName,
+        activatedCalendarIds: activated,
+        deactivatedCalendarIds: deactivated,
+      },
       () => {
         scrollBackToGroupSection();
         loadGroupsToPage();
       }
     );
-  });
+  } catch { /* invalidated */ }
+}
+
+// グループをOFF: グループON時の状態変更をすべて元に戻す
+function deactivateGroup() {
+  if (!isChromeContextValid()) return;
+  try {
+    chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
+      const activated = result.activatedCalendarIds || [];
+      const deactivated = result.deactivatedCalendarIds || [];
+      for (const id of activated) await setCalendarOff(id);
+      for (const id of deactivated) await setCalendarOn(id);
+      currentSelectedGroupName = null;
+      if (!isChromeContextValid()) return;
+      try {
+        chrome.storage.local.remove(
+          ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
+          () => {
+            scrollBackToGroupSection();
+            loadGroupsToPage();
+          }
+        );
+      } catch { /* invalidated */ }
+    });
+  } catch { /* invalidated */ }
 }
 
 // Google Calendar サイドバーにグループセクションを注入
@@ -432,33 +467,38 @@ function observeNavPanel() {
     document.querySelector('.hEtGGf.HDIIVe.sBn5T[jscontroller="TKuTKe"]') ||
     document.body;
 
-  new MutationObserver(() => {
+  const observer = new MutationObserver(() => {
+    if (!isChromeContextValid()) { observer.disconnect(); return; }
     if (!document.querySelector('#custom-group-section')) {
       insertGroupSection();
     }
-  }).observe(target, { childList: true, subtree: true });
+  });
+  observer.observe(target, { childList: true, subtree: true });
 
   insertGroupSection();
 }
 
 // ストレージからグループ選択状態を復元して再適用
 function getCurrentSelectedGroup() {
-  chrome.storage.local.get('currentSelectedGroup', (result) => {
-    currentSelectedGroupName = result.currentSelectedGroup || null;
-    if (currentSelectedGroupName) {
-      getStoredGroups().then((groups) => {
-        const group = groups[currentSelectedGroupName];
-        if (group) {
-          activateGroup(currentSelectedGroupName, group.map((c) => c.id));
-        } else {
-          currentSelectedGroupName = null;
-          loadGroupsToPage();
-        }
-      });
-    } else {
-      loadGroupsToPage();
-    }
-  });
+  if (!isChromeContextValid()) return;
+  try {
+    chrome.storage.local.get('currentSelectedGroup', (result) => {
+      currentSelectedGroupName = result.currentSelectedGroup || null;
+      if (currentSelectedGroupName) {
+        getStoredGroups().then((groups) => {
+          const group = groups[currentSelectedGroupName];
+          if (group) {
+            activateGroup(currentSelectedGroupName, group.map((c) => c.id));
+          } else {
+            currentSelectedGroupName = null;
+            loadGroupsToPage();
+          }
+        });
+      } else {
+        loadGroupsToPage();
+      }
+    });
+  } catch { /* invalidated */ }
 }
 
 // popup.js からのメッセージを受け取る
