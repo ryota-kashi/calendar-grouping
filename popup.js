@@ -182,3 +182,122 @@ function getSelectedCalendarsFrom(containerId) {
   });
   return selected;
 }
+
+function createGroup() {
+  const name = document.getElementById('groupNameInput').value.trim();
+  if (!name) return alert('グループ名を入力してください。');
+
+  getStoredGroups().then((groups) => {
+    if (groups[name]) return alert('同じ名前のグループが既に存在します。');
+
+    const selected = getSelectedCalendarsFrom('calendarList');
+    if (!selected.length) return alert('カレンダーが選択されていません。');
+
+    groups[name] = selected;
+    saveGroups(groups).then(() => {
+      loadGroups();
+      notifyContentScript();
+      document.getElementById('groupNameInput').value = '';
+      document.querySelectorAll('#calendarList input[type="checkbox"]')
+        .forEach((cb) => { cb.checked = false; });
+    });
+  });
+}
+
+function deleteGroup(groupName) {
+  if (!confirm(`「${groupName}」グループを削除しますか？`)) return;
+
+  getStoredGroups().then((groups) => {
+    delete groups[groupName];
+    const isActive = currentSelectedGroup === groupName;
+
+    const doDelete = () => {
+      saveGroups(groups).then(() => {
+        if (isActive) currentSelectedGroup = null;
+        loadGroups();
+        notifyContentScript();
+      });
+    };
+
+    if (isActive) {
+      sendToContentScript({ action: 'deactivateGroup' }).finally(doDelete);
+    } else {
+      doDelete();
+    }
+  });
+}
+
+function startEditingGroup(groupName) {
+  document.getElementById('editGroupSection').style.display = 'block';
+  document.getElementById('createGroupSection').style.display = 'none';
+  document.getElementById('editGroupNameInput').value = groupName;
+  document.getElementById('editGroupSection').dataset.editingGroup = groupName;
+
+  const editList = document.getElementById('editCalendarList');
+  editList.innerHTML = '';
+
+  const origItems = Array.from(
+    document.getElementById('calendarList').querySelectorAll('.calendar-item')
+  );
+  getStoredGroups().then((groups) => {
+    const groupCals = groups[groupName] || [];
+    for (const item of origItems) {
+      const clone = item.cloneNode(true);
+      clone.querySelector('input').checked = groupCals.some(
+        (c) => c.id === clone.querySelector('input').value
+      );
+      editList.appendChild(clone);
+    }
+  });
+}
+
+function updateGroup() {
+  const section = document.getElementById('editGroupSection');
+  const oldName = section.dataset.editingGroup;
+  const newName = document.getElementById('editGroupNameInput').value.trim();
+  if (!newName) return alert('グループ名を入力してください。');
+
+  getStoredGroups().then((groups) => {
+    if (newName !== oldName && groups[newName]) {
+      return alert('同じ名前のグループが既に存在します。');
+    }
+
+    const selected = getSelectedCalendarsFrom('editCalendarList');
+    if (!selected.length) return alert('カレンダーが選択されていません。');
+
+    delete groups[oldName];
+    groups[newName] = selected;
+
+    saveGroups(groups).then(() => {
+      if (currentSelectedGroup === oldName) currentSelectedGroup = newName;
+      loadGroups();
+      notifyContentScript();
+      cancelEditing();
+    });
+  });
+}
+
+function cancelEditing() {
+  document.getElementById('editGroupSection').style.display = 'none';
+  document.getElementById('createGroupSection').style.display = 'block';
+  document.getElementById('editGroupSection').dataset.editingGroup = '';
+  document.getElementById('editGroupNameInput').value = '';
+  document.getElementById('editCalendarList').innerHTML = '';
+}
+
+function toggleGroup(groupName) {
+  if (currentSelectedGroup === groupName) {
+    currentSelectedGroup = null;
+    sendToContentScript({ action: 'deactivateGroup' })
+      .catch(console.error)
+      .finally(() => updateGroupSelection());
+  } else {
+    currentSelectedGroup = groupName;
+    getStoredGroups().then((groups) => {
+      const calendarIds = (groups[groupName] || []).map((c) => c.id);
+      sendToContentScript({ action: 'activateGroup', groupName, calendarIds })
+        .catch(console.error)
+        .finally(() => updateGroupSelection());
+    });
+  }
+}
