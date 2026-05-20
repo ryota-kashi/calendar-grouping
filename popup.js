@@ -32,8 +32,10 @@ function loadCalendars() {
   return getCalendarsFromContentScript()
     .then(displayCalendarList)
     .catch((err) => {
-      console.error('[CalendarGrouping] loadCalendars failed:', err);
-      setCalendarListMessage('取得に失敗しました。再度お試しください。', true);
+      const msg = err.message === 'no_tab'
+        ? 'Googleカレンダーを開いてください。'
+        : 'Googleカレンダーのタブを更新してください。';
+      setCalendarListMessage(msg, true);
     });
 }
 
@@ -43,70 +45,24 @@ function setCalendarListMessage(text, isError = false) {
   listEl.innerHTML = `<div style="padding:10px;color:${isError ? '#d93025' : '#5f6368'};font-size:12px;">${text}</div>`;
 }
 
-// --- タブ管理 ---
+// --- content scriptとの通信 ---
 
-// ポップアップセッション中のGoogleカレンダータブID
-let _calendarTabId = null;
-
-function createTab(options) {
-  return new Promise((resolve) => chrome.tabs.create(options, resolve));
-}
-
-function waitForTabComplete(tabId) {
+function findCalendarTab() {
   return new Promise((resolve) => {
-    chrome.tabs.get(tabId, (tab) => {
-      if (tab?.status === 'complete') { resolve(); return; }
-      const listener = (id, info) => {
-        if (id === tabId && info.status === 'complete') {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
+    chrome.tabs.query({ url: 'https://calendar.google.com/*' }, (tabs) => {
+      resolve(tabs.length > 0 ? tabs[0].id : null);
     });
   });
 }
 
-// content scriptがpingに応答するまでリトライ
-function waitForContentScript(tabId) {
-  return new Promise((resolve) => {
-    let attempts = 0;
-    const tryPing = () => {
-      chrome.tabs.sendMessage(tabId, { action: 'ping' }, (response) => {
-        if (response?.pong) {
-          resolve();
-        } else if (attempts++ < 20) {
-          setTimeout(tryPing, 400);
-        } else {
-          resolve();
-        }
-      });
-    };
-    setTimeout(tryPing, 200);
-  });
-}
-
-// Googleカレンダーを新しいタブで開き、タブIDをキャッシュして返す
-async function getCalendarTabId() {
-  if (_calendarTabId !== null) return _calendarTabId;
-
-  setCalendarListMessage('Googleカレンダーを開いています...');
-  const tab = await createTab({ url: 'https://calendar.google.com/', active: false });
-  await waitForTabComplete(tab.id);
-  await waitForContentScript(tab.id);
-  chrome.tabs.update(tab.id, { active: true });
-  _calendarTabId = tab.id;
-  return tab.id;
-}
-
-// --- content scriptとの通信 ---
-
 async function getCalendarsFromContentScript() {
-  const tabId = await getCalendarTabId();
+  const tabId = await findCalendarTab();
+  if (tabId === null) throw new Error('no_tab');
+
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, { action: 'getCalendars' }, (response) => {
       if (chrome.runtime.lastError || !response?.calendars) {
-        return reject(chrome.runtime.lastError?.message || 'No response');
+        return reject(new Error('no_response'));
       }
       resolve(response.calendars);
     });
@@ -249,12 +205,12 @@ function setClearCacheButtonListener() {
 }
 
 async function sendToContentScript(message) {
-  const tabId = await getCalendarTabId();
-  await ensureContentScript(tabId);
+  const tabId = await findCalendarTab();
+  if (tabId === null) throw new Error('no_tab');
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, message, (response) => {
       if (chrome.runtime.lastError || !response?.success) {
-        return reject(chrome.runtime.lastError?.message || 'Failed');
+        return reject(new Error(chrome.runtime.lastError?.message || 'Failed'));
       }
       resolve(response);
     });
