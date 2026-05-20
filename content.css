@@ -1,0 +1,42 @@
+#custom-group-section {
+  margin-top: 20px;
+}
+
+#group-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.custom-nUt0vb {
+  --mdc-ripple-fg-size: 0;
+  --mdc-ripple-left: 0;
+  --mdc-ripple-top: 0;
+  --mdc-ripple-fg-scale: 1;
+  --mdc-ripple-fg-translate-end: 0;
+  --mdc-ripple-fg-translate-start: 0;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  will-change: transform, opacity;
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 4px;
+}
+
+.custom-uQ1ixe {
+  width: 100%;
+  margin: 0;
+  margin-bottom: 4px;
+  padding-left: 16px;
+  padding-right: 12px;
+  box-sizing: border-box;
+  border-radius: 0;
+  text-align: left;
+  height: 32px;
+}
