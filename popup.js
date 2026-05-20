@@ -43,7 +43,8 @@ function setCalendarListMessage(text, isError = false) {
   listEl.innerHTML = `<div style="padding:10px;color:${isError ? '#d93025' : '#5f6368'};font-size:12px;">${text}</div>`;
 }
 
-// Chrome tabs API をPromise化するヘルパー
+// --- タブ管理ユーティリティ ---
+
 function queryTabs(query) {
   return new Promise((resolve) => chrome.tabs.query(query, resolve));
 }
@@ -52,10 +53,8 @@ function createTab(options) {
   return new Promise((resolve) => chrome.tabs.create(options, resolve));
 }
 
-// タブのページ読み込み完了を待つ
 function waitForTabComplete(tabId) {
   return new Promise((resolve) => {
-    // すでに読み込み済みの場合はすぐ解決
     chrome.tabs.get(tabId, (tab) => {
       if (tab?.status === 'complete') { resolve(); return; }
       const listener = (id, info) => {
@@ -69,7 +68,7 @@ function waitForTabComplete(tabId) {
   });
 }
 
-// content scriptが応答するまでリトライ（pingで確認）
+// content scriptがpingに応答するまでリトライ
 function waitForContentScript(tabId) {
   return new Promise((resolve) => {
     let attempts = 0;
@@ -77,35 +76,40 @@ function waitForContentScript(tabId) {
       chrome.tabs.sendMessage(tabId, { action: 'ping' }, (response) => {
         if (response?.pong) {
           resolve();
-        } else if (attempts++ < 15) {
+        } else if (attempts++ < 20) {
           setTimeout(tryPing, 400);
         } else {
-          resolve(); // タイムアウトしても続行
+          resolve();
         }
       });
     };
-    setTimeout(tryPing, 300);
+    setTimeout(tryPing, 200);
   });
+}
+
+// content scriptが動いていなければ動的注入する
+async function ensureContentScript(tabId) {
+  const isRunning = await new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { action: 'ping' }, (response) => {
+      resolve(!chrome.runtime.lastError && response?.pong === true);
+    });
+  });
+
+  if (!isRunning) {
+    // 拡張機能リロード後など、既存タブにcontent scriptがない場合に注入
+    await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+    await chrome.scripting.insertCSS({ target: { tabId }, files: ['content.css'] });
+    await waitForContentScript(tabId);
+  }
 }
 
 // GoogleカレンダーのタブIDを取得。なければバックグラウンドで開いて待つ
 async function getCalendarTabId() {
-  // URLフィルターで検索
-  let tabs = await queryTabs({ url: 'https://calendar.google.com/*' });
+  // URLでGoogleカレンダータブを検索
+  const tabs = await queryTabs({ url: 'https://calendar.google.com/*' });
+  if (tabs.length > 0) return tabs[0].id;
 
-  // フォールバック: アクティブタブを確認
-  if (!tabs.length) {
-    const activeTabs = await queryTabs({ active: true, currentWindow: true });
-    if (activeTabs.length && activeTabs[0].url?.startsWith('https://calendar.google.com/')) {
-      tabs = activeTabs;
-    }
-  }
-
-  if (tabs.length > 0) {
-    return tabs[0].id;
-  }
-
-  // Googleカレンダーが開いていない → バックグラウンドで開いてポップアップを維持
+  // 開いていない場合はバックグラウンドで開く（ポップアップを閉じないためactive:false）
   setCalendarListMessage('Googleカレンダーを開いています...');
   const newTab = await createTab({ url: 'https://calendar.google.com/', active: false });
   await waitForTabComplete(newTab.id);
@@ -114,15 +118,17 @@ async function getCalendarTabId() {
   return newTab.id;
 }
 
-function getCalendarsFromContentScript() {
-  return getCalendarTabId().then((tabId) => {
-    return new Promise((resolve, reject) => {
-      chrome.tabs.sendMessage(tabId, { action: 'getCalendars' }, (response) => {
-        if (chrome.runtime.lastError || !response?.calendars) {
-          return reject(chrome.runtime.lastError?.message || 'No response');
-        }
-        resolve(response.calendars);
-      });
+// --- content scriptとの通信 ---
+
+async function getCalendarsFromContentScript() {
+  const tabId = await getCalendarTabId();
+  await ensureContentScript(tabId);
+  return new Promise((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, { action: 'getCalendars' }, (response) => {
+      if (chrome.runtime.lastError || !response?.calendars) {
+        return reject(chrome.runtime.lastError?.message || 'No response');
+      }
+      resolve(response.calendars);
     });
   });
 }
@@ -264,6 +270,7 @@ function setClearCacheButtonListener() {
 
 async function sendToContentScript(message) {
   const tabId = await getCalendarTabId();
+  await ensureContentScript(tabId);
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, message, (response) => {
       if (chrome.runtime.lastError || !response?.success) {

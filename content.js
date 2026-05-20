@@ -415,6 +415,8 @@ function setMessageListener() {
 }
 
 function initialize() {
+  if (window.__calendarGroupingInitialized) return;
+  window.__calendarGroupingInitialized = true;
   getCurrentSelectedGroup();
   observeNavPanel();
   setMessageListener();
