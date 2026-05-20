@@ -200,6 +200,7 @@ function createGroup() {
       document.getElementById('groupNameInput').value = '';
       document.querySelectorAll('#calendarList input[type="checkbox"]')
         .forEach((cb) => { cb.checked = false; });
+      showToast(`グループ「${name}」を作成しました！`);
     });
   });
 }
@@ -283,6 +284,13 @@ function cancelEditing() {
   document.getElementById('editGroupSection').dataset.editingGroup = '';
   document.getElementById('editGroupNameInput').value = '';
   document.getElementById('editCalendarList').innerHTML = '';
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('visible');
+  setTimeout(() => toast.classList.remove('visible'), 2500);
 }
 
 function toggleGroup(groupName) {
