@@ -1,4 +1,3 @@
-let currentSelectedGroup = null;
 let cachedCalendars = [];
 
 const COLOR_PALETTE = [
@@ -55,7 +54,6 @@ function sendMessage(tabId, message) {
 }
 
 async function injectContentScript(tabId) {
-  // 古いスクリプトの初期化フラグをリセットしてから再注入
   await chrome.scripting.executeScript({
     target: { tabId },
     func: () => { delete window.__calendarGroupingInitialized; },
@@ -128,13 +126,11 @@ function loadGroups() {
 }
 
 function createGroupCard(name, groups) {
-  const color   = getColorForGroup(name);
-  const isActive = name === currentSelectedGroup;
-  const count   = (groups[name] || []).length;
+  const color = getColorForGroup(name);
+  const count = (groups[name] || []).length;
 
   const card = document.createElement('div');
   card.classList.add('sp-group-card');
-  if (isActive) card.classList.add('sp-group-card--active');
 
   card.innerHTML = `
     <div class="sp-group-color" style="background:${color}"></div>
@@ -154,16 +150,7 @@ function createGroupCard(name, groups) {
         </svg>
       </button>
     </div>
-    <button class="sp-toggle-btn ${isActive ? 'sp-toggle-btn--active' : ''}" title="${isActive ? 'グループをOFF' : 'グループをON'}">
-      <svg viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-      </svg>
-    </button>
   `;
-
-  card.querySelector('.sp-toggle-btn').addEventListener('click', () => toggleGroup(name));
-  card.querySelector('.sp-group-info').addEventListener('click', () => toggleGroup(name));
-  card.querySelector('.sp-group-color').addEventListener('click', () => toggleGroup(name));
 
   card.querySelector('.sp-edit-btn').addEventListener('click', e => {
     e.stopPropagation();
@@ -178,37 +165,12 @@ function createGroupCard(name, groups) {
   return card;
 }
 
-// ===== グループ ON / OFF =====
-
-async function toggleGroup(name) {
-  if (currentSelectedGroup === name) {
-    currentSelectedGroup = null;
-    sendToContentScript({ action: 'deactivateGroup' }).catch(console.error);
-    chrome.storage.local.remove(['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds']);
-  } else {
-    const groups = await getStoredGroups();
-    const calendarIds = (groups[name] || []).map(c => c.id);
-    currentSelectedGroup = name;
-    sendToContentScript({ action: 'activateGroup', groupName: name, calendarIds }).catch(console.error);
-  }
-  loadGroups();
-}
-
 // ===== グループ削除 =====
 
 function deleteGroup(name) {
   getStoredGroups().then(groups => {
-    const wasActive = currentSelectedGroup === name;
     delete groups[name];
-    const doDelete = () => saveGroups(groups).then(() => {
-      if (wasActive) currentSelectedGroup = null;
-      loadGroups();
-    });
-    if (wasActive) {
-      sendToContentScript({ action: 'deactivateGroup' }).catch(console.error).finally(doDelete);
-    } else {
-      doDelete();
-    }
+    saveGroups(groups).then(() => loadGroups());
   });
 }
 
@@ -226,7 +188,6 @@ async function showForm(groupName = null) {
   form.style.display = 'block';
   document.getElementById('formGroupName').focus();
 
-  // カレンダー一覧を描画
   const calList = document.getElementById('formCalList');
   calList.innerHTML = '<div class="sp-loading">読み込み中...</div>';
 
@@ -265,10 +226,6 @@ function saveForm() {
     if (groups[name]) { alert('同じ名前のグループが既に存在します。'); return; }
     groups[name] = calendars;
     saveGroups(groups).then(() => {
-      if (editingGroupName && currentSelectedGroup === editingGroupName) {
-        currentSelectedGroup = name;
-        chrome.storage.local.set({ currentSelectedGroup: name });
-      }
       sendToContentScript({ action: 'refreshGroupList' }).catch(() => {});
       hideForm();
       loadGroups();
@@ -280,10 +237,7 @@ function saveForm() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if ('currentSelectedGroup' in changes) {
-    currentSelectedGroup = changes.currentSelectedGroup.newValue || null;
-  }
-  if ('calendarGroups' in changes || 'currentSelectedGroup' in changes) {
+  if ('calendarGroups' in changes) {
     loadGroups();
   }
 });
@@ -291,11 +245,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ===== 初期化 =====
 
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.storage.local.get('currentSelectedGroup', r => {
-    currentSelectedGroup = r.currentSelectedGroup || null;
-    loadGroups();
-  });
-
+  loadGroups();
   loadCalendars();
 
   document.getElementById('createGroupBtn').addEventListener('click', () => showForm());
