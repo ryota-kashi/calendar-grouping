@@ -7,17 +7,13 @@ const COLOR_PALETTE = [
   '#33B679', '#4285F4', '#9E69AF', '#A79B8E', '#616161',
   '#E67C73', '#F6BF26',
 ];
-const groupColors = {};
-
 function getColorForGroup(name) {
-  if (!groupColors[name]) {
-    const used = new Set(Object.values(groupColors));
-    const free = COLOR_PALETTE.filter(c => !used.has(c));
-    groupColors[name] = free.length > 0
-      ? free[Math.floor(Math.random() * free.length)]
-      : COLOR_PALETTE[Object.keys(groupColors).length % COLOR_PALETTE.length];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    hash |= 0;
   }
-  return groupColors[name];
+  return COLOR_PALETTE[Math.abs(hash) % COLOR_PALETTE.length];
 }
 
 // ===== ストレージ =====

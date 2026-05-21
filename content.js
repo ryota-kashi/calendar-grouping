@@ -126,13 +126,13 @@ const COLOR_PALETTE = [
   '#E67C73', '#F6BF26',
 ];
 
-const groupColors = {};
-
 function getRandomColorForGroup(groupName) {
-  if (groupColors[groupName]) return groupColors[groupName];
-  const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
-  groupColors[groupName] = color;
-  return color;
+  let hash = 0;
+  for (let i = 0; i < groupName.length; i++) {
+    hash = ((hash << 5) - hash) + groupName.charCodeAt(i);
+    hash |= 0;
+  }
+  return COLOR_PALETTE[Math.abs(hash) % COLOR_PALETTE.length];
 }
 
 function getStoredGroups() {
