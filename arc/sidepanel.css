@@ -1,24 +1,26 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
 :root {
-  --bg:           #0d1117;
-  --bg-card:      #161b22;
-  --bg-card-hover:#1c2128;
-  --border:       rgba(255, 255, 255, 0.15);
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-card-hover: #1c2128;
+  --border: rgba(255, 255, 255, 0.15);
   --border-hover: rgba(255, 255, 255, 0.24);
   --text-primary: #e6edf3;
-  --text-secondary:#c9d1d9;
-  --text-muted:   #8b949e;
-  --accent:       #6366f1;
+  --text-secondary: #c9d1d9;
+  --text-muted: #8b949e;
+  --accent: #6366f1;
   --accent-light: #818cf8;
-  --accent-pale:  #a5b4fc;
-  --accent-glow:  rgba(99, 102, 241, 0.35);
-  --danger:       #f85149;
-  --danger-bg:    rgba(248, 81, 73, 0.12);
+  --accent-pale: #a5b4fc;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --danger: #f85149;
+  --danger-bg: rgba(248, 81, 73, 0.12);
 }
 
 body {
@@ -89,8 +91,13 @@ body {
   text-overflow: ellipsis;
 }
 
-.sp-status-error { color: var(--danger); }
-.sp-status-ok    { color: #3fb950; }
+.sp-status-error {
+  color: var(--danger);
+}
+
+.sp-status-ok {
+  color: #3fb950;
+}
 
 .sp-refresh-btn {
   flex-shrink: 0;
@@ -103,9 +110,18 @@ body {
   padding: 12px;
 }
 
-.sp-content::-webkit-scrollbar { width: 4px; }
-.sp-content::-webkit-scrollbar-track { background: transparent; }
-.sp-content::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+.sp-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sp-content::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 2px;
+}
 
 /* ===== セクション ===== */
 .sp-section {
@@ -257,7 +273,10 @@ body {
   padding: 0;
 }
 
-.sp-action-btn svg { width: 16px; height: 16px; }
+.sp-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
 
 .sp-action-btn:hover {
   background: rgba(255, 255, 255, 0.1);
@@ -283,7 +302,10 @@ body {
   transition: opacity 0.15s;
 }
 
-.sp-drag-handle svg { width: 10px; height: 10px; }
+.sp-drag-handle svg {
+  width: 10px;
+  height: 10px;
+}
 
 .sp-group-card:hover .sp-drag-handle {
   opacity: 1;
@@ -347,7 +369,9 @@ body {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
-.sp-form-input::placeholder { color: var(--text-muted); }
+.sp-form-input::placeholder {
+  color: var(--text-muted);
+}
 
 .sp-form-label {
   display: block;
@@ -369,9 +393,18 @@ body {
   margin-bottom: 12px;
 }
 
-.sp-cal-list::-webkit-scrollbar { width: 4px; }
-.sp-cal-list::-webkit-scrollbar-track { background: transparent; }
-.sp-cal-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+.sp-cal-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sp-cal-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sp-cal-list::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 2px;
+}
 
 .sp-cal-item {
   display: flex;
@@ -385,7 +418,9 @@ body {
   user-select: none;
 }
 
-.sp-cal-item:hover { background: rgba(255, 255, 255, 0.05); }
+.sp-cal-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
 
 .sp-cal-item input[type="checkbox"] {
   cursor: pointer;
@@ -470,7 +505,10 @@ body {
   padding: 0;
 }
 
-.sp-icon-btn svg { width: 17px; height: 17px; }
+.sp-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
 
 .sp-icon-btn:hover {
   background: rgba(255, 255, 255, 0.1);
