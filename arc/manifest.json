@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "My Calendar Grouping",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Googleカレンダーのカレンダーをグループ単位で切り替えるChrome拡張機能",
   "action": {
     "default_icon": {

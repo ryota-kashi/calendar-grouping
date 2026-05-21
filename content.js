@@ -290,11 +290,6 @@ async function setCalendarOff(id) {
   return true;
 }
 
-function scrollBackToGroupSection() {
-  const section = document.querySelector('#custom-group-section');
-  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
 async function activateGroup(groupName, calendarIds) {
   const groupIdSet = new Set(calendarIds);
 
@@ -324,10 +319,7 @@ async function activateGroup(groupName, calendarIds) {
         activatedCalendarIds: activated,
         deactivatedCalendarIds: deactivated,
       },
-      () => {
-        scrollBackToGroupSection();
-        loadGroupsToPage();
-      }
+      () => { loadGroupsToPage(); }
     );
   } catch { /* invalidated */ }
 }
@@ -345,10 +337,7 @@ function deactivateGroup() {
       try {
         chrome.storage.local.remove(
           ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
-          () => {
-            scrollBackToGroupSection();
-            loadGroupsToPage();
-          }
+          () => { loadGroupsToPage(); }
         );
       } catch { /* invalidated */ }
     });
