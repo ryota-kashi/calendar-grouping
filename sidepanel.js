@@ -183,15 +183,20 @@ function createGroupCard(name, groups) {
 async function toggleGroup(name) {
   if (currentSelectedGroup === name) {
     currentSelectedGroup = null;
-    sendToContentScript({ action: 'deactivateGroup' }).catch(console.error);
-    chrome.storage.local.remove(['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds']);
+    loadGroups();
+    // ストレージ削除はコンテントスクリプトが復元完了後に行うため、ここでは削除しない
+    await sendToContentScript({ action: 'deactivateGroup' }).catch(err => {
+      setStatus(err.message === 'no_tab' ? 'Googleカレンダーを開いてください' : '接続失敗', 'error');
+    });
   } else {
     const groups = await getStoredGroups();
     const calendarIds = (groups[name] || []).map(c => c.id);
     currentSelectedGroup = name;
-    sendToContentScript({ action: 'activateGroup', groupName: name, calendarIds }).catch(console.error);
+    loadGroups();
+    await sendToContentScript({ action: 'activateGroup', groupName: name, calendarIds }).catch(err => {
+      setStatus(err.message === 'no_tab' ? 'Googleカレンダーを開いてください' : '接続失敗', 'error');
+    });
   }
-  loadGroups();
 }
 
 // ===== グループ削除 =====
