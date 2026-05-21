@@ -148,6 +148,15 @@ function getStoredGroups() {
   });
 }
 
+function saveGroups(groups) {
+  return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve(); return; }
+    try {
+      chrome.storage.local.set({ calendarGroups: groups }, resolve);
+    } catch { resolve(); }
+  });
+}
+
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
     if (!isChromeContextValid()) { resolve({}); return; }
@@ -187,13 +196,20 @@ function cacheCurrentCalendars() {
 async function getAllCalendarsFromCacheAndDOM() {
   const cache = await getStoredCalendarCache();
   const map = new Map(Object.entries(cache));
-  for (const cal of await scrollAndCollectCalendars()) {
+  console.log(`[GroupExt] キャッシュ: ${map.size}件`);
+
+  const domCals = await scrollAndCollectCalendars();
+  console.log(`[GroupExt] DOM収集: ${domCals.length}件`, domCals.map(c => c.name));
+
+  for (const cal of domCals) {
     map.set(cal.id, cal);
   }
   const newCache = {};
   map.forEach((v, k) => { newCache[k] = v; });
   try { chrome.storage.local.set({ calendarCache: newCache }); } catch { /* invalidated */ }
-  return Array.from(map.values());
+  const result = Array.from(map.values());
+  console.log(`[GroupExt] 合計: ${result.length}件`);
+  return result;
 }
 
 function initCalendarCache() {
@@ -640,7 +656,7 @@ function saveGroupFromForm(editingGroupName = null) {
       // 選択中だったグループの名称変更があった場合、状態を引き継ぐ
       if (editingGroupName && currentSelectedGroupName === editingGroupName) {
         currentSelectedGroupName = groupName;
-        chrome.storage.local.set({ currentSelectedGroup: groupName });
+        try { chrome.storage.local.set({ currentSelectedGroup: groupName }); } catch { /* invalidated */ }
       }
       hideGroupForm();
     });
