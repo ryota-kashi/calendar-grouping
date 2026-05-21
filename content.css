@@ -49,11 +49,11 @@
   transition: background-color 0.15s;
 }
 
-.group-item-row:hover {
+#custom-group-section .group-item-row:hover {
   background-color: #f1f3f4;
 }
 
-.group-item-row.group-item-active {
+#custom-group-section .group-item-row.group-item-active {
   background-color: rgba(26, 115, 232, 0.08);
 }
 

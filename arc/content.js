@@ -447,7 +447,6 @@ function loadGroupsToPage() {
       colorDot.style.background = color;
 
       const span = document.createElement('span');
-      span.classList.add('toUqff');
       span.textContent = groupName;
       span.style.cssText = 'flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
