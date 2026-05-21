@@ -55,16 +55,17 @@ async function scrollAndCollectCalendars() {
   return Array.from(collected.values());
 }
 
-// カレンダー要素を全件取得
+// カレンダー要素を全件取得（マイカレンダー・他のカレンダー両セクション対応）
 function findCalendarElements() {
-  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
-  const candidates = navPanel.querySelectorAll('div[data-id]');
-  const results = Array.from(candidates).filter(
+  // ページ全体を対象に検索することで、jscontrollerが異なる複数セクションをカバーする
+  const results = Array.from(document.querySelectorAll('div[data-id]')).filter(
     el => el.querySelector('input[type="checkbox"]')
   );
   if (results.length > 0) return results;
 
-  return Array.from(document.querySelectorAll('div[data-id]')).filter(
+  // フォールバック: navPanel内のみ検索
+  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
+  return Array.from(navPanel.querySelectorAll('div[data-id]')).filter(
     el => el.querySelector('input[type="checkbox"]')
   );
 }
