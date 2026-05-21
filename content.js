@@ -205,7 +205,11 @@ async function getAllCalendarsFromCacheAndDOM() {
   const newCache = {};
   map.forEach((v, k) => { newCache[k] = v; });
   try { chrome.storage.local.set({ calendarCache: newCache }); } catch { /* invalidated */ }
-  return Array.from(map.values());
+
+  // DOM スクロール順（サイドバー表示順）を優先し、キャッシュのみの項目を末尾に追加
+  const domIdSet = new Set(domCals.map(c => c.id));
+  const cacheOnly = Array.from(map.values()).filter(c => !domIdSet.has(c.id));
+  return [...domCals, ...cacheOnly];
 }
 
 // カレンダー要素がDOMに追加されたとき即座にキャッシュするオブザーバー
