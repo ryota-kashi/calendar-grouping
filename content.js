@@ -210,8 +210,36 @@ async function getAllCalendarsFromCacheAndDOM() {
   return result;
 }
 
+// カレンダー要素がDOMに追加されたとき即座にキャッシュするオブザーバー
+function observeCalendarDOMChanges() {
+  const observer = new MutationObserver((mutations) => {
+    if (!isChromeContextValid()) { observer.disconnect(); return; }
+    let hasCalendarNodes = false;
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        if (
+          node.matches?.('div[jscontroller="rHQf4"][data-id]') ||
+          node.querySelector?.('div[jscontroller="rHQf4"][data-id]')
+        ) {
+          hasCalendarNodes = true;
+          break;
+        }
+      }
+      if (hasCalendarNodes) break;
+    }
+    if (hasCalendarNodes) cacheCurrentCalendars();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function initCalendarCache() {
-  setTimeout(cacheCurrentCalendars, 2000);
+  // 段階的にキャッシュ（ページ読み込み直後・少し後・遅れて展開されるセクション用）
+  setTimeout(cacheCurrentCalendars, 1000);
+  setTimeout(cacheCurrentCalendars, 3000);
+  setTimeout(cacheCurrentCalendars, 6000);
+  // 「その他のカレンダー」展開時など、後から現れる要素も自動キャッシュ
+  observeCalendarDOMChanges();
 }
 
 let currentSelectedGroupName = null;
