@@ -118,23 +118,6 @@ function isCalendarOn(id) {
   return checkbox ? checkbox.checked : false;
 }
 
-const COLOR_PALETTE = [
-  '#AD1457', '#F4511E', '#E4C441', '#0B8043', '#3F51B5',
-  '#8E24AA', '#D81B60', '#EF6C00', '#C0CA33', '#009688',
-  '#7986CB', '#795548', '#D50000', '#F09300', '#7CB342',
-  '#33B679', '#4285F4', '#9E69AF', '#A79B8E', '#616161',
-  '#E67C73', '#F6BF26',
-];
-
-const groupColors = {};
-
-function getRandomColorForGroup(groupName) {
-  if (groupColors[groupName]) return groupColors[groupName];
-  const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
-  groupColors[groupName] = color;
-  return color;
-}
-
 function getStoredGroups() {
   return new Promise((resolve) => {
     if (!isChromeContextValid()) { resolve({}); return; }
@@ -288,11 +271,6 @@ async function setCalendarOff(id) {
   return true;
 }
 
-function scrollBackToGroupSection() {
-  const section = document.querySelector('#custom-group-section');
-  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
 async function activateGroup(groupName, calendarIds) {
   const groupIdSet = new Set(calendarIds);
 
@@ -316,17 +294,11 @@ async function activateGroup(groupName, calendarIds) {
   currentSelectedGroupName = groupName;
   if (!isChromeContextValid()) return;
   try {
-    chrome.storage.local.set(
-      {
-        currentSelectedGroup: groupName,
-        activatedCalendarIds: activated,
-        deactivatedCalendarIds: deactivated,
-      },
-      () => {
-        scrollBackToGroupSection();
-        loadGroupsToPage();
-      }
-    );
+    chrome.storage.local.set({
+      currentSelectedGroup: groupName,
+      activatedCalendarIds: activated,
+      deactivatedCalendarIds: deactivated,
+    });
   } catch { /* invalidated */ }
 }
 
@@ -342,389 +314,11 @@ function deactivateGroup() {
       if (!isChromeContextValid()) return;
       try {
         chrome.storage.local.remove(
-          ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
-          () => {
-            scrollBackToGroupSection();
-            loadGroupsToPage();
-          }
+          ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds']
         );
       } catch { /* invalidated */ }
     });
   } catch { /* invalidated */ }
-}
-
-// Google Calendar サイドバーにグループセクションを注入
-function insertGroupSection() {
-  if (document.querySelector('#custom-group-section')) return;
-
-  let targetH2 = null;
-  let sectionName = 'カレンダーグループ';
-
-  for (const h2 of document.querySelectorAll('h2.XuJrye')) {
-    const text = h2.textContent.trim();
-    if (text === 'カレンダー リスト') {
-      targetH2 = h2;
-    } else if (text === 'Calendar list') {
-      targetH2 = h2;
-      sectionName = 'Calendar groups';
-    }
-  }
-
-  if (!targetH2) {
-    console.error('[GroupExt] カレンダー リスト の h2 が見つかりません');
-    return;
-  }
-
-  const section = document.createElement('div');
-  section.id = 'custom-group-section';
-
-  // ヘッダーボタン部（アコーディオン）
-  const headerContainer = document.createElement('div');
-  headerContainer.style.cssText = 'display:flex;align-items:center;justify-content:space-between;width:100%;';
-
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.classList.add('custom-nUt0vb', 'custom-uQ1ixe');
-  btn.style.flex = '1';
-  btn.setAttribute('aria-expanded', 'true');
-  btn.innerHTML = `
-    <div class="GsuJoe"></div>
-    <div class="x5FT4e kkUTBb" style="width:100%;">
-      <div class="o8t45d" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
-        <div class="aIwHYe">${sectionName}</div>
-        <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true" style="margin-right:12px;">keyboard_arrow_up</i>
-      </div>
-    </div>
-  `;
-
-  // 新規追加「＋」ボタン
-  const addBtn = document.createElement('button');
-  addBtn.type = 'button';
-  addBtn.id = 'add-group-action-btn';
-  addBtn.title = '新しいグループを作成';
-  addBtn.innerHTML = '<i class="google-material-icons" style="font-size:18px;">add</i>';
-  addBtn.style.cssText = 'border:none;background:transparent;cursor:pointer;color:#5f6368;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;margin-right:12px;transition:background 0.15s;outline:none;';
-  addBtn.addEventListener('mouseenter', () => addBtn.style.backgroundColor = '#e8eaed');
-  addBtn.addEventListener('mouseleave', () => addBtn.style.backgroundColor = 'transparent');
-  addBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    showGroupForm();
-  });
-
-  headerContainer.appendChild(btn);
-  headerContainer.appendChild(addBtn);
-
-  const container = document.createElement('div');
-  container.id = 'group-list-container';
-  container.setAttribute('role', 'list');
-  container.setAttribute('aria-expanded', 'true');
-
-  const list = document.createElement('ul');
-  list.id = 'group-list';
-  container.appendChild(list);
-
-  // インラインフォーム用コンテナ
-  const formContainer = document.createElement('div');
-  formContainer.id = 'group-form-container';
-  formContainer.style.display = 'none';
-  container.appendChild(formContainer);
-
-  // フッター設定部（キャッシュクリア）
-  const footer = document.createElement('div');
-  footer.id = 'group-section-footer';
-  footer.style.cssText = 'padding:4px 16px;display:flex;justify-content:flex-end;';
-  const clearCacheLink = document.createElement('a');
-  clearCacheLink.href = '#';
-  clearCacheLink.textContent = 'キャッシュをクリア';
-  clearCacheLink.classList.add('cache-clear-link');
-  clearCacheLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (confirm('カレンダーキャッシュをクリアしますか？')) {
-      clearCalendarCache().then(() => {
-        alert('キャッシュをクリアしました。');
-        showGroupForm();
-      });
-    }
-  });
-  footer.appendChild(clearCacheLink);
-  container.appendChild(footer);
-
-  btn.addEventListener('click', () => {
-    const expanded = btn.getAttribute('aria-expanded') === 'true';
-    btn.setAttribute('aria-expanded', String(!expanded));
-    container.setAttribute('aria-expanded', String(!expanded));
-    btn.querySelector('i').textContent = expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_up';
-    container.style.display = expanded ? 'none' : 'block';
-  });
-
-  section.appendChild(headerContainer);
-  section.appendChild(container);
-  targetH2.insertAdjacentElement('afterend', section);
-
-  loadGroupsToPage();
-}
-
-// グループ一覧を描画
-function loadGroupsToPage() {
-  getStoredGroups().then((groups) => {
-    const list = document.getElementById('group-list');
-    if (!list) return;
-
-    list.style.visibility = 'hidden';
-    list.innerHTML = '';
-
-    for (const groupName of Object.keys(groups)) {
-      const color = getRandomColorForGroup(groupName);
-      const isActive = groupName === currentSelectedGroupName;
-
-      const item = document.createElement('li');
-      item.classList.add('group-item-row');
-      if (isActive) item.classList.add('group-item-active');
-      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-right:4px;cursor:pointer;position:relative;height:32px;';
-
-      item.addEventListener('mouseenter', () => {
-        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = '#f1f3f4';
-        item.querySelector('.group-item-actions').style.display = 'flex';
-      });
-      item.addEventListener('mouseleave', () => {
-        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = 'transparent';
-        item.querySelector('.group-item-actions').style.display = 'none';
-      });
-
-      // チェックボックス部
-      const checkboxDiv = document.createElement('div');
-      checkboxDiv.classList.add('zZj8Pb', 'EaVNbc');
-      checkboxDiv.style.marginRight = '-10px';
-
-      const checkboxWrapper = document.createElement('div');
-      checkboxWrapper.classList.add('lcPUt');
-
-      const checkboxContainer = document.createElement('div');
-      checkboxContainer.classList.add('VfPpkd-MPu53c', 'Ne8lhe', 'swXlm', 'az2ine', 'iIJNvc', 'd7WT8c');
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.classList.add('VfPpkd-muHVFf-bMcfAe');
-      checkbox.checked = isActive;
-
-      const checkboxIcon = document.createElement('div');
-      checkboxIcon.classList.add('VfPpkd-YQoJzd');
-      checkboxIcon.style.borderColor = color;
-      if (isActive) checkboxIcon.style.backgroundColor = color;
-      checkboxIcon.innerHTML = `
-        <svg aria-hidden="true" class="VfPpkd-HUofsb" viewBox="0 0 24 24">
-          <path class="VfPpkd-HUofsb-Jt5cK" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" stroke="white" stroke-width="2"></path>
-        </svg>
-        <div class="VfPpkd-SJnn3d"></div>
-      `;
-
-      checkboxContainer.appendChild(checkbox);
-      checkboxContainer.appendChild(checkboxIcon);
-      checkboxWrapper.appendChild(checkboxContainer);
-      checkboxDiv.appendChild(checkboxWrapper);
-
-      const span = document.createElement('span');
-      span.classList.add('toUqff', 'qZvm2d-ibnC6b-bN97Pc', 'HRaT6d');
-      span.textContent = groupName;
-      span.style.flex = '1';
-
-      // ON/OFF切り替えイベント
-      const toggleEvent = (e) => {
-        e.stopPropagation();
-        if (currentSelectedGroupName === groupName) {
-          deactivateGroup();
-        } else {
-          activateGroup(groupName, groups[groupName].map((c) => c.id));
-        }
-      };
-      checkboxDiv.addEventListener('click', toggleEvent);
-      span.addEventListener('click', toggleEvent);
-
-      // アクションボタン部（編集・削除）
-      const actionsDiv = document.createElement('div');
-      actionsDiv.classList.add('group-item-actions');
-      actionsDiv.style.cssText = 'display:none;align-items:center;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:inherit;padding-left:8px;';
-
-      // 編集ボタン
-      const editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.title = '編集';
-      editBtn.innerHTML = '<i class="google-material-icons">edit</i>';
-      editBtn.style.cssText = 'border:none;background:transparent;cursor:pointer;outline:none;margin-right:2px;';
-      editBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showGroupForm(groupName);
-      });
-
-      // 削除ボタン
-      const deleteBtn = document.createElement('button');
-      deleteBtn.type = 'button';
-      deleteBtn.title = '削除';
-      deleteBtn.innerHTML = '<i class="google-material-icons">delete</i>';
-      deleteBtn.style.cssText = 'border:none;background:transparent;cursor:pointer;outline:none;';
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (confirm(`グループ「${groupName}」を削除しますか？`)) {
-          deleteGroup(groupName);
-        }
-      });
-
-      actionsDiv.appendChild(editBtn);
-      actionsDiv.appendChild(deleteBtn);
-
-      item.appendChild(checkboxDiv);
-      item.appendChild(span);
-      item.appendChild(actionsDiv);
-      list.appendChild(item);
-    }
-
-    list.style.visibility = 'visible';
-  });
-}
-
-// グループ作成・編集インラインフォームを展開表示
-async function showGroupForm(editingGroupName = null) {
-  const formContainer = document.getElementById('group-form-container');
-  const list = document.getElementById('group-list');
-  const footer = document.getElementById('group-section-footer');
-  if (!formContainer) return;
-
-  // リストを非表示にしてフォームを展開
-  list.style.display = 'none';
-  footer.style.display = 'none';
-  formContainer.style.display = 'block';
-  formContainer.innerHTML = '読み込み中...';
-
-  // 全カレンダーの取得（DOM ＋ キャッシュ）
-  const calendars = await getAllCalendarsFromCacheAndDOM();
-  const storedGroups = await getStoredGroups();
-  const selectedCalendarIds = new Set(
-    editingGroupName ? (storedGroups[editingGroupName] || []).map(c => c.id) : []
-  );
-
-  formContainer.innerHTML = `
-    <div class="group-form-card">
-      <div class="group-form-card-title">
-        ${editingGroupName ? 'グループを編集' : 'グループを作成'}
-      </div>
-      <input type="text" id="inline-group-name-input"
-        class="group-form-input"
-        placeholder="グループ名を入力"
-        value="${editingGroupName || ''}"
-      />
-      <label class="group-form-cal-label">カレンダーを選択</label>
-      <div id="inline-calendar-list" class="group-form-cal-list">
-        ${calendars.map(cal => `
-          <label class="group-form-cal-item">
-            <input type="checkbox" value="${cal.id}" data-name="${cal.name}" ${selectedCalendarIds.has(cal.id) ? 'checked' : ''}/>
-            <span>${cal.name}</span>
-          </label>
-        `).join('')}
-      </div>
-      <div class="group-form-btns">
-        <button id="inline-group-save-btn" class="group-form-btn-save">保存</button>
-        <button id="inline-group-cancel-btn" class="group-form-btn-cancel">キャンセル</button>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('inline-group-save-btn').addEventListener('click', () => saveGroupFromForm(editingGroupName));
-  document.getElementById('inline-group-cancel-btn').addEventListener('click', hideGroupForm);
-}
-
-// フォームを閉じて元のリストに戻す
-function hideGroupForm() {
-  const formContainer = document.getElementById('group-form-container');
-  const list = document.getElementById('group-list');
-  const footer = document.getElementById('group-section-footer');
-  if (!formContainer) return;
-
-  formContainer.style.display = 'none';
-  formContainer.innerHTML = '';
-  list.style.display = 'block';
-  footer.style.display = 'flex';
-  loadGroupsToPage();
-}
-
-// フォーム内容をストレージに保存
-function saveGroupFromForm(editingGroupName = null) {
-  const nameInput = document.getElementById('inline-group-name-input');
-  const groupName = nameInput ? nameInput.value.trim() : '';
-
-  if (!groupName) {
-    alert('グループ名を入力してください。');
-    return;
-  }
-
-  const selectedCheckboxes = document.querySelectorAll('#inline-calendar-list input[type="checkbox"]:checked');
-  const selectedCalendars = Array.from(selectedCheckboxes).map(cb => ({
-    id: cb.value,
-    name: cb.getAttribute('data-name')
-  }));
-
-  if (selectedCalendars.length === 0) {
-    alert('カレンダーを1つ以上選択してください。');
-    return;
-  }
-
-  getStoredGroups().then((groups) => {
-    // 既存グループとの重複チェック（編集時は同名OK）
-    if (editingGroupName) {
-      delete groups[editingGroupName];
-    }
-    if (groups[groupName]) {
-      alert('同じ名前のグループが既に存在します。');
-      return;
-    }
-
-    groups[groupName] = selectedCalendars;
-    saveGroups(groups).then(() => {
-      // 選択中だったグループの名称変更があった場合、状態を引き継ぐ
-      if (editingGroupName && currentSelectedGroupName === editingGroupName) {
-        currentSelectedGroupName = groupName;
-        try { chrome.storage.local.set({ currentSelectedGroup: groupName }); } catch { /* invalidated */ }
-      }
-      hideGroupForm();
-    });
-  });
-}
-
-// グループの削除
-function deleteGroup(groupName) {
-  getStoredGroups().then((groups) => {
-    delete groups[groupName];
-    const isActive = currentSelectedGroupName === groupName;
-
-    const doDelete = () => {
-      saveGroups(groups).then(() => {
-        if (isActive) currentSelectedGroupName = null;
-        loadGroupsToPage();
-      });
-    };
-
-    if (isActive) {
-      deactivateGroup();
-      setTimeout(doDelete, 300);
-    } else {
-      doDelete();
-    }
-  });
-}
-
-function observeNavPanel() {
-  const target =
-    document.querySelector('.hEtGGf.HDIIVe.sBn5T[jscontroller="TKuTKe"]') ||
-    document.body;
-
-  const observer = new MutationObserver(() => {
-    if (!isChromeContextValid()) { observer.disconnect(); return; }
-    if (!document.querySelector('#custom-group-section')) {
-      insertGroupSection();
-    }
-  });
-  observer.observe(target, { childList: true, subtree: true });
-
-  insertGroupSection();
 }
 
 function getCurrentSelectedGroup() {
@@ -739,11 +333,8 @@ function getCurrentSelectedGroup() {
             activateGroup(currentSelectedGroupName, group.map((c) => c.id));
           } else {
             currentSelectedGroupName = null;
-            loadGroupsToPage();
           }
         });
-      } else {
-        loadGroupsToPage();
       }
     });
   } catch { /* invalidated */ }
@@ -762,7 +353,6 @@ function setMessageListener() {
       deactivateGroup();
       sendResponse({ success: true });
     } else if (message.action === 'refreshGroupList') {
-      loadGroupsToPage();
       sendResponse({ success: true });
     } else if (message.action === 'clearCache') {
       clearCalendarCache().then(() => sendResponse({ success: true }));
@@ -777,7 +367,6 @@ function initialize() {
   if (window.__calendarGroupingInitialized) return;
   window.__calendarGroupingInitialized = true;
   getCurrentSelectedGroup();
-  observeNavPanel();
   setMessageListener();
   initCalendarCache();
 }
