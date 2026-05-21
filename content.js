@@ -139,23 +139,32 @@ function getRandomColorForGroup(groupName) {
 
 function getStoredGroups() {
   return new Promise((resolve) => {
-    chrome.storage.local.get('calendarGroups', (result) => {
-      resolve(result.calendarGroups || {});
-    });
+    if (!isChromeContextValid()) { resolve({}); return; }
+    try {
+      chrome.storage.local.get('calendarGroups', (result) => {
+        resolve(result.calendarGroups || {});
+      });
+    } catch { resolve({}); }
   });
 }
 
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
-    chrome.storage.local.get('calendarCache', (result) => {
-      resolve(result.calendarCache || {});
-    });
+    if (!isChromeContextValid()) { resolve({}); return; }
+    try {
+      chrome.storage.local.get('calendarCache', (result) => {
+        resolve(result.calendarCache || {});
+      });
+    } catch { resolve({}); }
   });
 }
 
 function clearCalendarCache() {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ calendarCache: {} }, resolve);
+    if (!isChromeContextValid()) { resolve(); return; }
+    try {
+      chrome.storage.local.set({ calendarCache: {} }, resolve);
+    } catch { resolve(); }
   });
 }
 
@@ -169,7 +178,9 @@ function cacheCurrentCalendars() {
         updated = true;
       }
     }
-    if (updated) chrome.storage.local.set({ calendarCache: cache });
+    if (updated) {
+      try { chrome.storage.local.set({ calendarCache: cache }); } catch { /* invalidated */ }
+    }
   });
 }
 
@@ -181,7 +192,7 @@ async function getAllCalendarsFromCacheAndDOM() {
   }
   const newCache = {};
   map.forEach((v, k) => { newCache[k] = v; });
-  chrome.storage.local.set({ calendarCache: newCache });
+  try { chrome.storage.local.set({ calendarCache: newCache }); } catch { /* invalidated */ }
   return Array.from(map.values());
 }
 
@@ -208,8 +219,12 @@ async function scrollToReveal(id) {
 }
 
 async function setCalendarOn(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
   if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  el = findCalendarItemById(id);
+  if (!el) { console.log(`[GroupExt] calendar disappeared after scroll: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || checkbox.checked) return false;
   checkbox.click();
@@ -218,8 +233,12 @@ async function setCalendarOn(id) {
 }
 
 async function setCalendarOff(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
   if (!el) { console.log(`[GroupExt] calendar not in DOM: ${id}`); return false; }
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  el = findCalendarItemById(id);
+  if (!el) { console.log(`[GroupExt] calendar disappeared after scroll: ${id}`); return false; }
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || !checkbox.checked) return false;
   checkbox.click();
@@ -655,7 +674,8 @@ function observeNavPanel() {
     document.querySelector('.hEtGGf.HDIIVe.sBn5T[jscontroller="TKuTKe"]') ||
     document.body;
 
-  new MutationObserver(() => {
+  const observer = new MutationObserver(() => {
+    if (!isChromeContextValid()) { observer.disconnect(); return; }
     if (!document.querySelector('#custom-group-section')) {
       insertGroupSection();
     }
