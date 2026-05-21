@@ -496,12 +496,26 @@ function setMessageListener() {
   });
 }
 
+function setStorageListener() {
+  if (!isChromeContextValid()) return;
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !isChromeContextValid()) return;
+      if ('calendarGroups' in changes) {
+        insertGroupSection();
+        loadGroupsToPage();
+      }
+    });
+  } catch { /* invalidated */ }
+}
+
 function initialize() {
   if (window.__calendarGroupingInitialized) return;
   window.__calendarGroupingInitialized = true;
   getCurrentSelectedGroup();
   observeNavPanel();
   setMessageListener();
+  setStorageListener();
   initCalendarCache();
 }
 
