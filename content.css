@@ -57,6 +57,13 @@
   background-color: rgba(26, 115, 232, 0.08);
 }
 
+.group-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* === 編集・削除アクションボタン === */
 .group-item-actions {
   z-index: 10;

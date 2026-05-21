@@ -407,63 +407,26 @@ function loadGroupsToPage() {
       const item = document.createElement('li');
       item.classList.add('group-item-row');
       if (isActive) item.classList.add('group-item-active');
-      item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-right:4px;cursor:pointer;position:relative;height:32px;';
+      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;cursor:pointer;height:32px;';
 
-      item.addEventListener('mouseenter', () => {
-        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = '#f1f3f4';
-      });
-      item.addEventListener('mouseleave', () => {
-        if (groupName !== currentSelectedGroupName) item.style.backgroundColor = 'transparent';
-      });
-
-      const checkboxDiv = document.createElement('div');
-      checkboxDiv.classList.add('zZj8Pb', 'EaVNbc');
-      checkboxDiv.style.marginRight = '-10px';
-
-      const checkboxWrapper = document.createElement('div');
-      checkboxWrapper.classList.add('lcPUt');
-
-      const checkboxContainer = document.createElement('div');
-      checkboxContainer.classList.add('VfPpkd-MPu53c', 'Ne8lhe', 'swXlm', 'az2ine', 'iIJNvc', 'd7WT8c');
-
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.classList.add('VfPpkd-muHVFf-bMcfAe');
-      checkbox.checked = isActive;
-
-      const checkboxIcon = document.createElement('div');
-      checkboxIcon.classList.add('VfPpkd-YQoJzd');
-      checkboxIcon.style.borderColor = color;
-      if (isActive) checkboxIcon.style.backgroundColor = color;
-      checkboxIcon.innerHTML = `
-        <svg aria-hidden="true" class="VfPpkd-HUofsb" viewBox="0 0 24 24">
-          <path class="VfPpkd-HUofsb-Jt5cK" fill="none" d="M1.73,12.91 8.1,19.28 22.79,4.59" stroke="white" stroke-width="2"></path>
-        </svg>
-        <div class="VfPpkd-SJnn3d"></div>
-      `;
-
-      checkboxContainer.appendChild(checkbox);
-      checkboxContainer.appendChild(checkboxIcon);
-      checkboxWrapper.appendChild(checkboxContainer);
-      checkboxDiv.appendChild(checkboxWrapper);
+      const colorDot = document.createElement('div');
+      colorDot.classList.add('group-color-dot');
+      colorDot.style.background = color;
 
       const span = document.createElement('span');
-      span.classList.add('toUqff', 'qZvm2d-ibnC6b-bN97Pc', 'HRaT6d');
+      span.classList.add('toUqff');
       span.textContent = groupName;
-      span.style.flex = '1';
+      span.style.cssText = 'flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
-      const toggleEvent = (e) => {
-        e.stopPropagation();
+      item.addEventListener('click', () => {
         if (currentSelectedGroupName === groupName) {
           deactivateGroup();
         } else {
           activateGroup(groupName, groups[groupName].map((c) => c.id));
         }
-      };
-      checkboxDiv.addEventListener('click', toggleEvent);
-      span.addEventListener('click', toggleEvent);
+      });
 
-      item.appendChild(checkboxDiv);
+      item.appendChild(colorDot);
       item.appendChild(span);
       list.appendChild(item);
     }
