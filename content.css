@@ -232,17 +232,3 @@
   background: #f1f3f4;
 }
 
-/* === キャッシュクリアリンク === */
-.cache-clear-link {
-  font-size: 10px;
-  color: #9aa0a6;
-  text-decoration: none;
-  cursor: pointer;
-  transition: color 0.15s;
-  padding: 2px 4px;
-  border-radius: 3px;
-}
-
-.cache-clear-link:hover {
-  color: #d93025;
-}

@@ -137,6 +137,7 @@ function getRandomColorForGroup(groupName) {
 
 function getStoredGroups() {
   return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve({}); return; }
     try {
       chrome.storage.local.get('calendarGroups', (result) => {
         resolve(result.calendarGroups || {});
@@ -145,16 +146,20 @@ function getStoredGroups() {
   });
 }
 
-function saveGroups(groups) {
+function getStoredOrder() {
   return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve([]); return; }
     try {
-      chrome.storage.local.set({ calendarGroups: groups }, resolve);
-    } catch { resolve(); }
+      chrome.storage.local.get('calendarGroupsOrder', (result) => {
+        resolve(result.calendarGroupsOrder || []);
+      });
+    } catch { resolve([]); }
   });
 }
 
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve({}); return; }
     try {
       chrome.storage.local.get('calendarCache', (result) => {
         resolve(result.calendarCache || {});
@@ -165,6 +170,7 @@ function getStoredCalendarCache() {
 
 function clearCalendarCache() {
   return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve(); return; }
     try {
       chrome.storage.local.set({ calendarCache: {} }, resolve);
     } catch { resolve(); }
@@ -190,7 +196,10 @@ function cacheCurrentCalendars() {
 async function getAllCalendarsFromCacheAndDOM() {
   const cache = await getStoredCalendarCache();
   const map = new Map(Object.entries(cache));
-  for (const cal of await scrollAndCollectCalendars()) {
+
+  const domCals = await scrollAndCollectCalendars();
+
+  for (const cal of domCals) {
     map.set(cal.id, cal);
   }
   const newCache = {};
@@ -237,35 +246,43 @@ async function scrollToReveal(id) {
   const scrollEl = getNavScrollable();
   const saved = scrollEl.scrollTop;
   scrollEl.scrollTop = 0;
-  await sleep(50);
+  await sleep(150);
   while (true) {
     const el = findCalendarItemById(id);
     if (el) return el;
     if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5) break;
     scrollEl.scrollTop += 150;
-    await sleep(50);
+    await sleep(150);
   }
   scrollEl.scrollTop = saved;
   return null;
 }
 
 async function setCalendarOn(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  el = findCalendarItemById(id);
   if (!el) return false;
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || checkbox.checked) return false;
-  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
+  await sleep(80);
   return true;
 }
 
 async function setCalendarOff(id) {
-  const el = findCalendarItemById(id) || await scrollToReveal(id);
+  let el = findCalendarItemById(id) || await scrollToReveal(id);
+  if (!el) return false;
+  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
+  await sleep(100);
+  el = findCalendarItemById(id);
   if (!el) return false;
   const checkbox = el.querySelector('input[type="checkbox"]');
   if (!checkbox || !checkbox.checked) return false;
-  el.scrollIntoView({ behavior: 'instant', block: 'nearest' });
   checkbox.click();
+  await sleep(80);
   return true;
 }
 
@@ -277,8 +294,9 @@ function scrollBackToGroupSection() {
 async function activateGroup(groupName, calendarIds) {
   const groupIdSet = new Set(calendarIds);
 
+  // スクロールして全カレンダーを収集してから非活性化（仮想スクロール対応）
   const deactivated = [];
-  for (const cal of getAllCalendars()) {
+  for (const cal of await scrollAndCollectCalendars()) {
     if (!groupIdSet.has(cal.id) && isCalendarOn(cal.id)) {
       await setCalendarOff(cal.id);
       deactivated.push(cal.id);
@@ -294,6 +312,7 @@ async function activateGroup(groupName, calendarIds) {
   }
 
   currentSelectedGroupName = groupName;
+  if (!isChromeContextValid()) return;
   try {
     chrome.storage.local.set(
       {
@@ -310,6 +329,7 @@ async function activateGroup(groupName, calendarIds) {
 }
 
 function deactivateGroup() {
+  if (!isChromeContextValid()) return;
   try {
     chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
       const activated = result.activatedCalendarIds || [];
@@ -317,6 +337,7 @@ function deactivateGroup() {
       for (const id of activated) await setCalendarOff(id);
       for (const id of deactivated) await setCalendarOn(id);
       currentSelectedGroupName = null;
+      if (!isChromeContextValid()) return;
       try {
         chrome.storage.local.remove(
           ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
@@ -330,8 +351,14 @@ function deactivateGroup() {
   } catch { /* invalidated */ }
 }
 
+const GROUP_SECTION_VERSION = '3';
+
 function insertGroupSection() {
-  if (document.querySelector('#custom-group-section')) return;
+  const existing = document.querySelector('#custom-group-section');
+  if (existing) {
+    if (existing.dataset.version === GROUP_SECTION_VERSION) return;
+    existing.remove();
+  }
 
   let targetH2 = null;
   let sectionName = 'カレンダーグループ';
@@ -353,6 +380,7 @@ function insertGroupSection() {
 
   const section = document.createElement('div');
   section.id = 'custom-group-section';
+  section.dataset.version = GROUP_SECTION_VERSION;
 
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -393,21 +421,33 @@ function insertGroupSection() {
 }
 
 function loadGroupsToPage() {
-  getStoredGroups().then((groups) => {
+  Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     const list = document.getElementById('group-list');
     if (!list) return;
 
     list.style.visibility = 'hidden';
     list.innerHTML = '';
 
-    for (const groupName of Object.keys(groups)) {
+    const names = Object.keys(groups);
+    const sorted = [
+      ...order.filter((n) => groups[n]),
+      ...names.filter((n) => !order.includes(n)),
+    ];
+
+    for (const groupName of sorted) {
       const color = getRandomColorForGroup(groupName);
       const isActive = groupName === currentSelectedGroupName;
 
       const item = document.createElement('li');
       item.classList.add('group-item-row');
       if (isActive) item.classList.add('group-item-active');
-      item.style.cssText = 'display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;cursor:pointer;height:32px;';
+      item.style.cssText = 'display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;cursor:pointer;height:32px;';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = isActive;
+      checkbox.tabIndex = -1;
+      checkbox.style.cssText = `width:14px;height:14px;flex-shrink:0;accent-color:${color};pointer-events:none;`;
 
       const colorDot = document.createElement('div');
       colorDot.classList.add('group-color-dot');
@@ -426,6 +466,7 @@ function loadGroupsToPage() {
         }
       });
 
+      item.appendChild(checkbox);
       item.appendChild(colorDot);
       item.appendChild(span);
       list.appendChild(item);
@@ -452,6 +493,7 @@ function observeNavPanel() {
 }
 
 function getCurrentSelectedGroup() {
+  if (!isChromeContextValid()) return;
   try {
     chrome.storage.local.get('currentSelectedGroup', (result) => {
       currentSelectedGroupName = result.currentSelectedGroup || null;
@@ -501,7 +543,7 @@ function setStorageListener() {
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local' || !isChromeContextValid()) return;
-      if ('calendarGroups' in changes) {
+      if ('calendarGroups' in changes || 'calendarGroupsOrder' in changes) {
         insertGroupSection();
         loadGroupsToPage();
       }

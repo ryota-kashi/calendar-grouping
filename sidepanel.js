@@ -30,6 +30,18 @@ function saveGroups(groups) {
   );
 }
 
+function getStoredOrder() {
+  return new Promise(resolve =>
+    chrome.storage.local.get('calendarGroupsOrder', r => resolve(r.calendarGroupsOrder || []))
+  );
+}
+
+function saveOrder(order) {
+  return new Promise(resolve =>
+    chrome.storage.local.set({ calendarGroupsOrder: order }, resolve)
+  );
+}
+
 // ===== content script との通信 =====
 
 function findCalendarTab() {
@@ -101,10 +113,16 @@ async function loadCalendars() {
   return cachedCalendars;
 }
 
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ===== グループ一覧 =====
 
+let dragSrcName = null;
+
 function loadGroups() {
-  getStoredGroups().then(groups => {
+  Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     const list = document.getElementById('groupList');
     if (!list) return;
     list.innerHTML = '';
@@ -115,7 +133,12 @@ function loadGroups() {
       return;
     }
 
-    for (const name of names) {
+    const sorted = [
+      ...order.filter(n => groups[n]),
+      ...names.filter(n => !order.includes(n)),
+    ];
+
+    for (const name of sorted) {
       list.appendChild(createGroupCard(name, groups));
     }
   });
@@ -127,11 +150,17 @@ function createGroupCard(name, groups) {
 
   const card = document.createElement('div');
   card.classList.add('sp-group-card');
+  card.draggable = true;
 
   card.innerHTML = `
+    <div class="sp-drag-handle" title="ドラッグして並べ替え">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M5 3a1 1 0 110 2 1 1 0 010-2zm0 4a1 1 0 110 2 1 1 0 010-2zm0 4a1 1 0 110 2 1 1 0 010-2zm4-8a1 1 0 110 2 1 1 0 010-2zm0 4a1 1 0 110 2 1 1 0 010-2zm0 4a1 1 0 110 2 1 1 0 010-2z"/>
+      </svg>
+    </div>
     <div class="sp-group-color" style="background:${color}"></div>
     <div class="sp-group-info">
-      <span class="sp-group-name">${name}</span>
+      <span class="sp-group-name">${escapeHtml(name)}</span>
       <span class="sp-group-count">${count}件のカレンダー</span>
     </div>
     <div class="sp-group-actions">
@@ -147,6 +176,63 @@ function createGroupCard(name, groups) {
       </button>
     </div>
   `;
+
+  // ドラッグ開始: ゴースト画像キャプチャ後にクラスを付与して半透明化
+  card.addEventListener('dragstart', e => {
+    dragSrcName = name;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => card.classList.add('sp-dragging'), 0);
+  });
+
+  card.addEventListener('dragend', () => {
+    dragSrcName = null;
+    card.classList.remove('sp-dragging');
+    document.querySelectorAll('.sp-drag-over-top, .sp-drag-over-bottom')
+      .forEach(el => el.classList.remove('sp-drag-over-top', 'sp-drag-over-bottom'));
+  });
+
+  card.addEventListener('dragover', e => {
+    if (!dragSrcName || dragSrcName === name) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    // マウス位置でカードの上半分/下半分を判定して挿入位置を示す
+    const rect = card.getBoundingClientRect();
+    const isUpper = e.clientY < rect.top + rect.height / 2;
+    document.querySelectorAll('.sp-drag-over-top, .sp-drag-over-bottom')
+      .forEach(el => el.classList.remove('sp-drag-over-top', 'sp-drag-over-bottom'));
+    card.classList.add(isUpper ? 'sp-drag-over-top' : 'sp-drag-over-bottom');
+  });
+
+  card.addEventListener('dragleave', e => {
+    if (!card.contains(e.relatedTarget)) {
+      card.classList.remove('sp-drag-over-top', 'sp-drag-over-bottom');
+    }
+  });
+
+  card.addEventListener('drop', async e => {
+    e.preventDefault();
+    if (!dragSrcName || dragSrcName === name) return;
+    const rect = card.getBoundingClientRect();
+    const insertBefore = e.clientY < rect.top + rect.height / 2;
+    card.classList.remove('sp-drag-over-top', 'sp-drag-over-bottom');
+
+    const src = dragSrcName;
+    const [grps, order] = await Promise.all([getStoredGroups(), getStoredOrder()]);
+    const allNames = Object.keys(grps);
+    const currentSorted = [
+      ...order.filter(n => grps[n]),
+      ...allNames.filter(n => !order.includes(n)),
+    ];
+    const srcIdx = currentSorted.indexOf(src);
+    let dstIdx = currentSorted.indexOf(name);
+    if (srcIdx === -1 || dstIdx === -1) return;
+
+    currentSorted.splice(srcIdx, 1);
+    dstIdx = currentSorted.indexOf(name);
+    currentSorted.splice(insertBefore ? dstIdx : dstIdx + 1, 0, src);
+    await saveOrder(currentSorted);
+    loadGroups();
+  });
 
   card.querySelector('.sp-edit-btn').addEventListener('click', e => {
     e.stopPropagation();
@@ -164,9 +250,10 @@ function createGroupCard(name, groups) {
 // ===== グループ削除 =====
 
 function deleteGroup(name) {
-  getStoredGroups().then(groups => {
+  Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     delete groups[name];
-    saveGroups(groups).then(() => loadGroups());
+    const newOrder = order.filter(n => n !== name);
+    Promise.all([saveGroups(groups), saveOrder(newOrder)]).then(() => loadGroups());
   });
 }
 
@@ -198,8 +285,8 @@ async function showForm(groupName = null) {
 
   calList.innerHTML = calendars.map(cal => `
     <label class="sp-cal-item">
-      <input type="checkbox" value="${cal.id}" data-name="${cal.name}" ${selected.has(cal.id) ? 'checked' : ''}/>
-      <span>${cal.name}</span>
+      <input type="checkbox" value="${escapeHtml(cal.id)}" data-name="${escapeHtml(cal.name)}" ${selected.has(cal.id) ? 'checked' : ''}/>
+      <span>${escapeHtml(cal.name)}</span>
     </label>
   `).join('');
 }
@@ -217,11 +304,16 @@ function saveForm() {
   const calendars = Array.from(checked).map(cb => ({ id: cb.value, name: cb.dataset.name }));
   if (calendars.length === 0) { alert('カレンダーを1つ以上選択してください。'); return; }
 
-  getStoredGroups().then(groups => {
-    if (editingGroupName) delete groups[editingGroupName];
+  Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
+    if (editingGroupName) {
+      delete groups[editingGroupName];
+      const idx = order.indexOf(editingGroupName);
+      if (idx !== -1) order[idx] = name;
+    }
     if (groups[name]) { alert('同じ名前のグループが既に存在します。'); return; }
     groups[name] = calendars;
-    saveGroups(groups).then(() => {
+    if (!order.includes(name)) order.push(name);
+    Promise.all([saveGroups(groups), saveOrder(order)]).then(() => {
       sendToContentScript({ action: 'refreshGroupList' }).catch(() => {});
       hideForm();
       loadGroups();
@@ -233,7 +325,7 @@ function saveForm() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
-  if ('calendarGroups' in changes) {
+  if ('calendarGroups' in changes || 'calendarGroupsOrder' in changes) {
     loadGroups();
   }
 });

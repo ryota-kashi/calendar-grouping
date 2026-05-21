@@ -269,42 +269,40 @@ body {
   color: var(--danger);
 }
 
-/* トグルボタン */
-.sp-toggle-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
+/* ドラッグハンドル */
+.sp-drag-handle {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
-  flex-shrink: 0;
-  padding: 0;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+  transition: opacity 0.15s;
 }
 
-.sp-toggle-btn svg { width: 15px; height: 15px; }
+.sp-drag-handle svg { width: 10px; height: 10px; }
 
-.sp-toggle-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
+.sp-group-card:hover .sp-drag-handle {
+  opacity: 1;
 }
 
-.sp-toggle-btn--active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  box-shadow: 0 2px 8px var(--accent-glow);
+/* ドラッグ中のカード */
+.sp-group-card.sp-dragging {
+  opacity: 0.35;
 }
 
-.sp-toggle-btn--active:hover {
-  background: #7c7ff5;
-  border-color: #7c7ff5;
+/* ドロップ位置インジケーター */
+.sp-group-card.sp-drag-over-top {
+  border-top: 2px solid var(--accent);
 }
+
+.sp-group-card.sp-drag-over-bottom {
+  border-bottom: 2px solid var(--accent);
+}
+
 
 /* ===== 作成・編集フォーム ===== */
 .sp-form {
