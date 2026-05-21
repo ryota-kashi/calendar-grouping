@@ -57,15 +57,12 @@ async function scrollAndCollectCalendars() {
 
 // カレンダー要素を全件取得（マイカレンダー・他のカレンダー両セクション対応）
 function findCalendarElements() {
-  // ページ全体を対象に検索することで、jscontrollerが異なる複数セクションをカバーする
-  const results = Array.from(document.querySelectorAll('div[data-id]')).filter(
-    el => el.querySelector('input[type="checkbox"]')
-  );
+  // jscontroller="rHQf4" がカレンダー項目の正確なセレクタ（両セクション共通）
+  const results = Array.from(document.querySelectorAll('div[jscontroller="rHQf4"][data-id]'));
   if (results.length > 0) return results;
 
-  // フォールバック: navPanel内のみ検索
-  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
-  return Array.from(navPanel.querySelectorAll('div[data-id]')).filter(
+  // フォールバック: チェックボックスを持つ data-id 要素を広く検索
+  return Array.from(document.querySelectorAll('div[data-id]')).filter(
     el => el.querySelector('input[type="checkbox"]')
   );
 }
