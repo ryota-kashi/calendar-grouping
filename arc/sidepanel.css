@@ -166,6 +166,18 @@ body {
   border-color: rgba(99, 102, 241, 0.45);
 }
 
+.sp-save-view-btn {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.28);
+}
+
+.sp-save-view-btn:hover {
+  background: rgba(16, 185, 129, 0.22);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.45);
+}
+
 /* ===== グループ一覧 ===== */
 .sp-group-list {
   display: flex;

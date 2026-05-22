@@ -835,6 +835,9 @@ function setMessageListener() {
       sendResponse({ success: true });
     } else if (message.action === 'clearCache') {
       clearCalendarCache().then(() => sendResponse({ success: true }));
+    } else if (message.action === 'getCurrentActiveCalendars') {
+      const calendars = getAllCalendars().filter(cal => isCalendarOn(cal.id));
+      sendResponse({ calendars });
     } else {
       sendResponse({ success: false });
     }

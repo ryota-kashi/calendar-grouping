@@ -261,12 +261,13 @@ function deleteGroup(name) {
 
 let editingGroupName = null;
 
-async function showForm(groupName = null) {
+async function showForm(groupName = null, preSelectedIds = null) {
   editingGroupName = groupName;
 
   const form = document.getElementById('groupForm');
-  document.getElementById('formTitle').textContent =
-    groupName ? 'グループを編集' : '新しいグループを作成';
+  document.getElementById('formTitle').textContent = groupName
+    ? 'グループを編集'
+    : (preSelectedIds ? '現在の表示をグループとして保存' : '新しいグループを作成');
   document.getElementById('formGroupName').value = groupName || '';
   form.style.display = 'block';
   document.getElementById('formGroupName').focus();
@@ -276,7 +277,8 @@ async function showForm(groupName = null) {
 
   const calendars = cachedCalendars.length > 0 ? cachedCalendars : await loadCalendars();
   const groups = await getStoredGroups();
-  const selected = new Set((groupName ? groups[groupName] || [] : []).map(c => c.id));
+  const selected = preSelectedIds
+    ?? new Set((groupName ? groups[groupName] || [] : []).map(c => c.id));
 
   if (calendars.length === 0) {
     calList.innerHTML = '<div class="sp-loading">カレンダーが見つかりません。<br>Googleカレンダーを開いてください。</div>';
@@ -289,6 +291,25 @@ async function showForm(groupName = null) {
       <span>${escapeHtml(cal.name)}</span>
     </label>
   `).join('');
+}
+
+async function saveCurrentView() {
+  try {
+    setStatus('現在の表示を取得中...', '');
+    const res = await sendToContentScript({ action: 'getCurrentActiveCalendars' });
+    const preSelectedIds = new Set((res.calendars || []).map(c => c.id));
+    if (preSelectedIds.size === 0) {
+      setStatus('ONのカレンダーがありません', 'error');
+      return;
+    }
+    await showForm(null, preSelectedIds);
+    setStatus(`${cachedCalendars.length}件のカレンダーを取得`, 'ok');
+  } catch (err) {
+    setStatus(
+      err.message === 'no_tab' ? 'Googleカレンダーを開いてください' : '接続失敗。ページを更新してください',
+      'error'
+    );
+  }
 }
 
 function hideForm() {
@@ -354,6 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadCalendars();
   initMultiGroupToggle();
 
+  document.getElementById('saveCurrentViewBtn').addEventListener('click', saveCurrentView);
   document.getElementById('createGroupBtn').addEventListener('click', () => showForm());
   document.getElementById('refreshBtn').addEventListener('click', loadCalendars);
   document.getElementById('formSaveBtn').addEventListener('click', saveForm);

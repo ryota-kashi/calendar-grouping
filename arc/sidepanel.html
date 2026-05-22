@@ -64,12 +64,20 @@
       <div class="sp-section">
         <div class="sp-section-header">
           <span class="sp-section-title">グループ一覧</span>
-          <button id="createGroupBtn" class="sp-create-btn">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="11" height="11">
-              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
-            </svg>
-            新規作成
-          </button>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button id="saveCurrentViewBtn" class="sp-create-btn sp-save-view-btn" title="現在ONのカレンダーをグループとして保存">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="11" height="11">
+                <path d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"/>
+              </svg>
+              保存
+            </button>
+            <button id="createGroupBtn" class="sp-create-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="11" height="11">
+                <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+              </svg>
+              新規作成
+            </button>
+          </div>
         </div>
         <div id="groupList" class="sp-group-list"></div>
       </div>
