@@ -304,10 +304,31 @@ async function setCalendarOff(id) {
 }
 
 async function captureCurrentCalendarState() {
+  // スクロールしながらその場でON/OFFを記録する（スクロール後はDOMから消えるため）
+  const scrollEl = getNavScrollable();
+  const saved = scrollEl.scrollTop;
   const state = {};
-  for (const cal of await scrollAndCollectCalendars()) {
-    state[cal.id] = isCalendarOn(cal.id);
+
+  const capture = () => {
+    for (const el of findCalendarElements()) {
+      const id = getCalendarId(el);
+      if (!id || id in state) continue;
+      const checkbox = el.querySelector('input[type="checkbox"]');
+      state[id] = checkbox ? checkbox.checked : false;
+    }
+  };
+
+  scrollEl.scrollTop = 0;
+  await sleep(80);
+  capture();
+
+  while (scrollEl.scrollTop + scrollEl.clientHeight < scrollEl.scrollHeight - 5) {
+    scrollEl.scrollTop += 150;
+    await sleep(80);
+    capture();
   }
+
+  scrollEl.scrollTop = saved;
   return state;
 }
 
