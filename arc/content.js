@@ -331,9 +331,31 @@ async function restoreOriginalState(originalCalendarState) {
   }
 }
 
+// 変更が必要なカレンダーのみ操作する差分計算
+function computeDiff(targetOnIds, prevOnIds) {
+  const toTurnOn = [...targetOnIds].filter(id => !prevOnIds.has(id));
+  const toTurnOff = [...prevOnIds].filter(id => !targetOnIds.has(id));
+  return { toTurnOn, toTurnOff };
+}
+
+// 差分だけを適用（全スクロール不要）
+async function applyCalendarStateDiff(toTurnOn, toTurnOff) {
+  for (const id of toTurnOn) await setCalendarOn(id);
+  for (const id of toTurnOff) await setCalendarOff(id);
+}
+
+// グループリストのローディング状態を切り替え
+function setGroupListLoading(isLoading) {
+  const container = document.getElementById('group-list-container');
+  if (!container) return;
+  if (isLoading) container.dataset.loading = '1';
+  else delete container.dataset.loading;
+}
+
 async function activateGroup(groupName) {
   if (!isChromeContextValid() || _activating) return;
   _activating = true;
+  setGroupListLoading(true);
   try {
     const [groups, isMulti, stored] = await Promise.all([
       getStoredGroups(),
@@ -346,27 +368,38 @@ async function activateGroup(groupName) {
     ]);
 
     // インメモリが空の場合はストレージを一次ソースとして使う（リロード直後の初回呼び出し対策）
-    let newActive = activeGroups.length > 0 ? [...activeGroups] : (stored.activeGroups || []);
+    const currentActive = activeGroups.length > 0 ? [...activeGroups] : (stored.activeGroups || []);
     let originalState = stored.originalCalendarState || null;
 
-    if (newActive.length === 0) {
+    if (currentActive.length === 0) {
       originalState = await captureCurrentCalendarState();
     }
 
-    if (isMulti) {
-      if (!newActive.includes(groupName)) newActive = [...newActive, groupName];
-    } else {
-      newActive = [groupName];
-    }
+    const newActive = isMulti
+      ? (currentActive.includes(groupName) ? [...currentActive] : [...currentActive, groupName])
+      : [groupName];
 
-    const targetOnIds = new Set();
-    for (const name of newActive) {
-      for (const cal of (groups[name] || [])) {
-        targetOnIds.add(cal.id);
+    // 変更前のON状態を計算
+    const prevOnIds = new Set();
+    if (currentActive.length === 0) {
+      for (const [id, wasOn] of Object.entries(originalState)) {
+        if (wasOn) prevOnIds.add(id);
+      }
+    } else {
+      for (const name of currentActive) {
+        for (const cal of (groups[name] || [])) prevOnIds.add(cal.id);
       }
     }
 
-    await applyCalendarState(targetOnIds);
+    // 変更後のON状態を計算
+    const targetOnIds = new Set();
+    for (const name of newActive) {
+      for (const cal of (groups[name] || [])) targetOnIds.add(cal.id);
+    }
+
+    // 差分のみ適用
+    const { toTurnOn, toTurnOff } = computeDiff(targetOnIds, prevOnIds);
+    await applyCalendarStateDiff(toTurnOn, toTurnOff);
     activeGroups = newActive;
 
     try {
@@ -383,19 +416,34 @@ async function activateGroup(groupName) {
 async function deactivateGroup(groupName) {
   if (!isChromeContextValid() || _activating) return;
   _activating = true;
+  setGroupListLoading(true);
   try {
-    const stored = await new Promise((resolve) => {
-      try {
-        chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
-      } catch { resolve({}); }
-    });
+    const [groups, stored] = await Promise.all([
+      getStoredGroups(),
+      new Promise((resolve) => {
+        try {
+          chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+        } catch { resolve({}); }
+      }),
+    ]);
 
     const base = activeGroups.length > 0 ? activeGroups : (stored.activeGroups || []);
     const newActive = base.filter((n) => n !== groupName);
     const originalState = stored.originalCalendarState || {};
 
+    // 変更前のON状態（現在アクティブなグループの全カレンダー）
+    const prevOnIds = new Set();
+    for (const name of base) {
+      for (const cal of (groups[name] || [])) prevOnIds.add(cal.id);
+    }
+
     if (newActive.length === 0) {
-      await restoreOriginalState(originalState);
+      // 全グループ無効化 → 元の状態に差分復元
+      const originalOnIds = new Set(
+        Object.entries(originalState).filter(([, on]) => on).map(([id]) => id)
+      );
+      const { toTurnOn, toTurnOff } = computeDiff(originalOnIds, prevOnIds);
+      await applyCalendarStateDiff(toTurnOn, toTurnOff);
       activeGroups = [];
       try {
         chrome.storage.local.remove(
@@ -404,14 +452,13 @@ async function deactivateGroup(groupName) {
         );
       } catch { /* invalidated */ }
     } else {
-      const groups = await getStoredGroups();
+      // まだ他のグループが有効 → 差分適用
       const targetOnIds = new Set();
       for (const name of newActive) {
-        for (const cal of (groups[name] || [])) {
-          targetOnIds.add(cal.id);
-        }
+        for (const cal of (groups[name] || [])) targetOnIds.add(cal.id);
       }
-      await applyCalendarState(targetOnIds);
+      const { toTurnOn, toTurnOff } = computeDiff(targetOnIds, prevOnIds);
+      await applyCalendarStateDiff(toTurnOn, toTurnOff);
       activeGroups = newActive;
       try {
         chrome.storage.local.set(
@@ -428,14 +475,32 @@ async function deactivateGroup(groupName) {
 async function resetAllGroups() {
   if (!isChromeContextValid() || _activating) return;
   _activating = true;
+  setGroupListLoading(true);
   try {
-    const stored = await new Promise((resolve) => {
-      try {
-        chrome.storage.local.get('originalCalendarState', (r) => resolve(r));
-      } catch { resolve({}); }
-    });
+    const [groups, stored] = await Promise.all([
+      getStoredGroups(),
+      new Promise((resolve) => {
+        try {
+          chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+        } catch { resolve({}); }
+      }),
+    ]);
 
-    await restoreOriginalState(stored.originalCalendarState || {});
+    const currentActive = activeGroups.length > 0 ? activeGroups : (stored.activeGroups || []);
+    const originalState = stored.originalCalendarState || {};
+
+    // 現在アクティブなグループの全カレンダー
+    const prevOnIds = new Set();
+    for (const name of currentActive) {
+      for (const cal of (groups[name] || [])) prevOnIds.add(cal.id);
+    }
+
+    // 元の状態に差分復元
+    const originalOnIds = new Set(
+      Object.entries(originalState).filter(([, on]) => on).map(([id]) => id)
+    );
+    const { toTurnOn, toTurnOff } = computeDiff(originalOnIds, prevOnIds);
+    await applyCalendarStateDiff(toTurnOn, toTurnOff);
     activeGroups = [];
     try {
       chrome.storage.local.remove(
@@ -594,6 +659,8 @@ function insertGroupSection() {
 }
 
 function loadGroupsToPage() {
+  // DOM更新時にローディング状態を解除
+  setGroupListLoading(false);
   Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     const list = document.getElementById('group-list');
     const resetContainer = document.getElementById('group-reset-container');
@@ -680,6 +747,7 @@ function observeNavPanel() {
 async function initActiveGroups() {
   if (!isChromeContextValid() || _activating) return;
   _activating = true;
+  setGroupListLoading(true);
   try {
     const result = await new Promise((resolve) => {
       try {
@@ -692,11 +760,31 @@ async function initActiveGroups() {
       const groups = await getStoredGroups();
       const targetOnIds = new Set();
       for (const name of activeGroups) {
-        for (const cal of (groups[name] || [])) {
-          targetOnIds.add(cal.id);
+        for (const cal of (groups[name] || [])) targetOnIds.add(cal.id);
+      }
+
+      // 現在DOMに見えているカレンダーをスクロールなしで即座に適用
+      const visibleIds = new Set();
+      for (const el of findCalendarElements()) {
+        const id = getCalendarId(el);
+        if (!id) continue;
+        visibleIds.add(id);
+        const checkbox = el.querySelector('input[type="checkbox"]');
+        if (!checkbox) continue;
+        if (targetOnIds.has(id) && !checkbox.checked) {
+          checkbox.click();
+          await sleep(50);
+        } else if (!targetOnIds.has(id) && checkbox.checked) {
+          checkbox.click();
+          await sleep(50);
         }
       }
-      await applyCalendarState(targetOnIds);
+
+      // 非可視のターゲットカレンダーはスクロールして表示しON
+      for (const id of targetOnIds) {
+        if (!visibleIds.has(id)) await setCalendarOn(id);
+      }
+
       loadGroupsToPage();
     } else {
       loadGroupsToPage();
