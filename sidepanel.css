@@ -505,3 +505,60 @@ body {
   color: var(--danger);
   background: var(--danger-bg);
 }
+
+/* === モード切り替えトグル === */
+.sp-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 10px;
+}
+
+.sp-mode-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sp-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sp-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sp-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #30363d;
+  border-radius: 20px;
+  transition: 0.2s;
+}
+
+.sp-toggle-slider::before {
+  position: absolute;
+  content: '';
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  bottom: 3px;
+  background: #8b949e;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.sp-toggle input:checked + .sp-toggle-slider {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+.sp-toggle input:checked + .sp-toggle-slider::before {
+  background: var(--accent-light);
+  transform: translateX(16px);
+}
