@@ -1,0 +1,50 @@
+<h2>複数グループ同時ONの動作</h2>
+<p class="subtitle">グループ1（AさんBさん）とグループ2（CさんDさん）を両方ONにしたとき、EさんFさんはどうなりますか？</p>
+
+<div class="cards">
+  <div class="card" data-choice="hide-all-others" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="card-image" style="padding:16px;background:#f8f9fa;border-radius:8px;margin-bottom:12px;font-size:13px;font-family:monospace;">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:0.9">
+          <input type="checkbox" checked style="accent-color:#1a73e8"> <span>グループ1</span> <span style="font-size:11px;color:#1a73e8;margin-left:auto">✓ ON</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:0.9">
+          <input type="checkbox" checked style="accent-color:#e91e63"> <span>グループ2</span> <span style="font-size:11px;color:#e91e63;margin-left:auto">✓ ON</span>
+        </div>
+        <hr style="margin:8px 0;border-color:#e0e0e0">
+        <div style="color:#aaa;font-size:11px">カレンダー一覧</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#1a73e8">✓ Aさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#1a73e8">✓ Bさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#e91e63">✓ Cさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#e91e63">✓ Dさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#aaa;text-decoration:line-through">✗ Eさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#aaa;text-decoration:line-through">✗ Fさん</div>
+      </div>
+      <h3>A: グループ外は全員OFF</h3>
+      <p>どのグループにも属していないEさん・Fさんは非表示になる</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="keep-others" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="card-image" style="padding:16px;background:#f8f9fa;border-radius:8px;margin-bottom:12px;font-size:13px;font-family:monospace;">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+          <input type="checkbox" checked style="accent-color:#1a73e8"> <span>グループ1</span> <span style="font-size:11px;color:#1a73e8;margin-left:auto">✓ ON</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+          <input type="checkbox" checked style="accent-color:#e91e63"> <span>グループ2</span> <span style="font-size:11px;color:#e91e63;margin-left:auto">✓ ON</span>
+        </div>
+        <hr style="margin:8px 0;border-color:#e0e0e0">
+        <div style="color:#aaa;font-size:11px">カレンダー一覧</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#1a73e8">✓ Aさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#1a73e8">✓ Bさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#e91e63">✓ Cさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#e91e63">✓ Dさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#555">✓ Eさん</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;color:#555">✓ Fさん</div>
+      </div>
+      <h3>B: グループ外はそのまま</h3>
+      <p>EさんFさんはON/OFFの状態を変えずに維持される</p>
+    </div>
+  </div>
+</div>

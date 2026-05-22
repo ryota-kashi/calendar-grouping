@@ -1,0 +1,104 @@
+<h2>サイドバー内に設定トグルを置く場合</h2>
+<p class="subtitle">「カレンダーグループ」セクションヘッダーの右端に歯車アイコンを追加するイメージ</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">案1: セクションヘッダーに歯車アイコン</div>
+    <div class="mockup-body" style="background:#fff;padding:0;font-family:'Google Sans',Roboto,sans-serif;">
+      <!-- Google Calendar nav mockup -->
+      <div style="padding:0 0 8px 0;font-size:13px;">
+        <!-- Other calendars section (above) -->
+        <div style="padding:4px 16px;color:#5f6368;font-size:11px;font-weight:600;letter-spacing:0.5px">マイカレンダー</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 16px;height:32px">
+          <input type="checkbox" checked style="accent-color:#1a73e8;width:12px;height:12px"><span style="font-size:13px;color:#3c4043">Aさん</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 12px 4px 16px;height:32px">
+          <input type="checkbox" checked style="accent-color:#e91e63;width:12px;height:12px"><span style="font-size:13px;color:#3c4043">Bさん</span>
+        </div>
+
+        <!-- Group section -->
+        <div style="display:flex;align-items:center;padding:2px 12px 2px 16px;height:32px;background:#f8f9fa;border-top:1px solid #e8eaed;border-bottom:1px solid #e8eaed;margin:4px 0;">
+          <span style="font-size:13px;font-weight:500;color:#3c4043;flex:1">カレンダーグループ</span>
+          <!-- 歯車アイコン -->
+          <button title="複数グループ同時ON" style="border:none;background:none;cursor:pointer;padding:4px;border-radius:4px;color:#5f6368;display:flex;align-items:center;font-size:16px">⚙</button>
+        </div>
+
+        <!-- Group items -->
+        <div style="display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;height:32px;border-radius:4px;background:rgba(26,115,232,0.08)">
+          <input type="checkbox" checked style="accent-color:#1a73e8;width:14px;height:14px">
+          <div style="width:10px;height:10px;border-radius:2px;background:#1a73e8;flex-shrink:0"></div>
+          <span style="font-size:13px;color:#3c4043">グループ1</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;height:32px">
+          <input type="checkbox" style="width:14px;height:14px">
+          <div style="width:10px;height:10px;border-radius:2px;background:#e91e63;flex-shrink:0"></div>
+          <span style="font-size:13px;color:#3c4043">グループ2</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">⚙ クリック後 — ミニ設定パネルが出現</div>
+    <div class="mockup-body" style="background:#fff;padding:0;font-family:'Google Sans',Roboto,sans-serif;font-size:13px;position:relative;">
+      <!-- Group section with gear highlighted -->
+      <div style="display:flex;align-items:center;padding:2px 12px 2px 16px;height:32px;background:#f8f9fa;border-top:1px solid #e8eaed;border-bottom:1px solid #e8eaed;margin:4px 0;">
+        <span style="font-size:13px;font-weight:500;color:#3c4043;flex:1">カレンダーグループ</span>
+        <button style="border:none;background:rgba(26,115,232,0.12);cursor:pointer;padding:4px;border-radius:4px;color:#1a73e8;display:flex;align-items:center;font-size:16px">⚙</button>
+      </div>
+
+      <!-- Dropdown panel -->
+      <div style="margin:0 8px 8px;padding:10px 12px;background:#fff;border:1px solid #dadce0;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+        <div style="font-size:11px;font-weight:600;color:#5f6368;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">グループ選択モード</div>
+
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">
+          <input type="radio" name="mode" style="accent-color:#1a73e8">
+          <div>
+            <div style="font-size:12px;color:#202124;font-weight:500">切り替えモード</div>
+            <div style="font-size:11px;color:#5f6368">1つのグループのみON（現在の動作）</div>
+          </div>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;">
+          <input type="radio" name="mode" checked style="accent-color:#1a73e8">
+          <div>
+            <div style="font-size:12px;color:#202124;font-weight:500">複数選択モード</div>
+            <div style="font-size:11px;color:#5f6368">複数グループを同時にON可能</div>
+          </div>
+        </label>
+      </div>
+
+      <!-- Group items -->
+      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;height:32px;border-radius:4px;background:rgba(26,115,232,0.08)">
+        <input type="checkbox" checked style="accent-color:#1a73e8;width:14px;height:14px">
+        <div style="width:10px;height:10px;border-radius:2px;background:#1a73e8;flex-shrink:0"></div>
+        <span style="font-size:13px;color:#3c4043">グループ1</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;height:32px">
+        <input type="checkbox" style="width:14px;height:14px">
+        <div style="width:10px;height:10px;border-radius:2px;background:#e91e63;flex-shrink:0"></div>
+        <span style="font-size:13px;color:#3c4043">グループ2</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;">
+  <h3>デメリットも確認</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>メリット</h4>
+      <ul>
+        <li>Googleカレンダーのページを離れず設定できる</li>
+        <li>モードがすぐ目につく</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>デメリット</h4>
+      <ul>
+        <li>セクションヘッダーに小さなアイコンを追加するためUI実装がやや複雑</li>
+        <li>Googleカレンダー側のDOM更新で壊れるリスクが少し増える</li>
+      </ul>
+    </div>
+  </div>
+</div>

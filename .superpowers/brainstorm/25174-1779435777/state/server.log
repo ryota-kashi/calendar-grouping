@@ -1,0 +1,6 @@
+{"type":"server-started","port":63187,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:63187","screen_dir":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/content","state_dir":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/state"}
+{"type":"screen-added","file":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/content/multi-group-behavior.html"}
+{"type":"screen-added","file":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/content/activation-model.html"}
+{"type":"screen-added","file":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/content/waiting.html"}
+{"type":"screen-added","file":"/Users/shoki.ikegami/Documents/GitHub/calendar-grouping/.superpowers/brainstorm/25174-1779435777/content/sidebar-toggle.html"}
+{"type":"server-stopped","reason":"idle timeout"}
