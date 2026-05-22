@@ -429,7 +429,7 @@ async function resetAllGroups() {
   } catch { /* invalidated */ }
 }
 
-const GROUP_SECTION_VERSION = '3';
+const GROUP_SECTION_VERSION = '4';
 
 function insertGroupSection() {
   const existing = document.querySelector('#custom-group-section');
@@ -469,8 +469,34 @@ function insertGroupSection() {
     <div class="x5FT4e kkUTBb" style="width:100%;">
       <div class="o8t45d" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <div class="aIwHYe">${sectionName}</div>
-        <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true" style="margin-right:12px;">keyboard_arrow_up</i>
+        <div style="display:flex;align-items:center;">
+          <button type="button" class="group-gear-btn" title="グループ選択モード設定" style="border:none;background:none;cursor:pointer;padding:4px;border-radius:4px;color:#5f6368;display:flex;align-items:center;font-size:16px;line-height:1;margin-right:2px;">⚙</button>
+          <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true" style="margin-right:12px;">keyboard_arrow_up</i>
+        </div>
       </div>
+    </div>
+  `;
+
+  const settingsPanel = document.createElement('div');
+  settingsPanel.id = 'group-settings-panel';
+  settingsPanel.style.display = 'none';
+  settingsPanel.innerHTML = `
+    <div class="group-settings-inner">
+      <div class="group-settings-title">グループ選択モード</div>
+      <label class="group-settings-label">
+        <input type="radio" name="group-mode" value="single">
+        <div>
+          <div class="group-settings-mode-name">切り替えモード</div>
+          <div class="group-settings-mode-desc">1つのグループのみON</div>
+        </div>
+      </label>
+      <label class="group-settings-label">
+        <input type="radio" name="group-mode" value="multi">
+        <div>
+          <div class="group-settings-mode-name">複数選択モード</div>
+          <div class="group-settings-mode-desc">複数グループを同時にON可能</div>
+        </div>
+      </label>
     </div>
   `;
 
@@ -483,6 +509,9 @@ function insertGroupSection() {
   list.id = 'group-list';
   container.appendChild(list);
 
+  const resetContainer = document.createElement('div');
+  resetContainer.id = 'group-reset-container';
+
   btn.addEventListener('click', () => {
     const expanded = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', String(!expanded));
@@ -491,9 +520,36 @@ function insertGroupSection() {
     container.style.display = expanded ? 'none' : 'block';
   });
 
+  const gearBtn = btn.querySelector('.group-gear-btn');
+  gearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = settingsPanel.style.display !== 'none';
+    settingsPanel.style.display = isOpen ? 'none' : 'block';
+    gearBtn.style.background = isOpen ? '' : 'rgba(26,115,232,0.12)';
+    gearBtn.style.color = isOpen ? '' : '#1a73e8';
+  });
+
+  settingsPanel.querySelectorAll('input[name="group-mode"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!isChromeContextValid()) return;
+      const isMulti = radio.value === 'multi';
+      try {
+        chrome.storage.local.set({ multiGroupMode: isMulti });
+      } catch { /* invalidated */ }
+    });
+  });
+
   section.appendChild(btn);
+  section.appendChild(settingsPanel);
   section.appendChild(container);
+  section.appendChild(resetContainer);
   targetH2.insertAdjacentElement('afterend', section);
+
+  getStoredMultiGroupMode().then((isMulti) => {
+    settingsPanel.querySelectorAll('input[name="group-mode"]').forEach((r) => {
+      r.checked = r.value === (isMulti ? 'multi' : 'single');
+    });
+  });
 
   loadGroupsToPage();
 }

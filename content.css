@@ -232,3 +232,68 @@
   background: #f1f3f4;
 }
 
+/* === ⚙ 設定パネル === */
+.group-settings-inner {
+  margin: 0 8px 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.group-settings-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.group-settings-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.group-settings-label input[type="radio"] {
+  accent-color: #1a73e8;
+  flex-shrink: 0;
+}
+
+.group-settings-mode-name {
+  font-size: 12px;
+  color: #202124;
+  font-weight: 500;
+}
+
+.group-settings-mode-desc {
+  font-size: 11px;
+  color: #5f6368;
+}
+
+/* === すべてOFFボタン === */
+.group-reset-btn {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 4px 14px 6px;
+  padding: 5px 12px;
+  background: #fff;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Google Sans', Roboto, sans-serif;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.group-reset-btn:hover {
+  background: #f1f3f4;
+  border-color: #bdc1c6;
+}
+
