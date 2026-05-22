@@ -341,7 +341,7 @@ async function activateGroup(groupName) {
     }),
   ]);
 
-  let newActive = stored.activeGroups || [];
+  let newActive = [...activeGroups];
   let originalState = stored.originalCalendarState || null;
 
   if (newActive.length === 0) {
@@ -557,6 +557,7 @@ function insertGroupSection() {
 function loadGroupsToPage() {
   Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     const list = document.getElementById('group-list');
+    const resetContainer = document.getElementById('group-reset-container');
     if (!list) return;
 
     list.style.visibility = 'hidden';
@@ -570,7 +571,7 @@ function loadGroupsToPage() {
 
     for (const groupName of sorted) {
       const color = getRandomColorForGroup(groupName);
-      const isActive = groupName === currentSelectedGroupName;
+      const isActive = activeGroups.includes(groupName);
 
       const item = document.createElement('li');
       item.classList.add('group-item-row');
@@ -592,10 +593,10 @@ function loadGroupsToPage() {
       span.style.cssText = 'flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
       item.addEventListener('click', () => {
-        if (currentSelectedGroupName === groupName) {
-          deactivateGroup();
+        if (activeGroups.includes(groupName)) {
+          deactivateGroup(groupName);
         } else {
-          activateGroup(groupName, groups[groupName].map((c) => c.id));
+          activateGroup(groupName);
         }
       });
 
@@ -606,6 +607,18 @@ function loadGroupsToPage() {
     }
 
     list.style.visibility = 'visible';
+
+    if (resetContainer) {
+      resetContainer.innerHTML = '';
+      if (activeGroups.length > 0) {
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.classList.add('group-reset-btn');
+        resetBtn.textContent = 'すべてOFF';
+        resetBtn.addEventListener('click', () => resetAllGroups());
+        resetContainer.appendChild(resetBtn);
+      }
+    }
   });
 }
 
@@ -625,20 +638,21 @@ function observeNavPanel() {
   insertGroupSection();
 }
 
-function getCurrentSelectedGroup() {
+function initActiveGroups() {
   if (!isChromeContextValid()) return;
   try {
-    chrome.storage.local.get('currentSelectedGroup', (result) => {
-      currentSelectedGroupName = result.currentSelectedGroup || null;
-      if (currentSelectedGroupName) {
+    chrome.storage.local.get('activeGroups', (result) => {
+      const storedActive = result.activeGroups || [];
+      activeGroups = storedActive;
+      if (storedActive.length > 0) {
         getStoredGroups().then((groups) => {
-          const group = groups[currentSelectedGroupName];
-          if (group) {
-            activateGroup(currentSelectedGroupName, group.map((c) => c.id));
-          } else {
-            currentSelectedGroupName = null;
-            loadGroupsToPage();
+          const targetOnIds = new Set();
+          for (const name of activeGroups) {
+            for (const cal of (groups[name] || [])) {
+              targetOnIds.add(cal.id);
+            }
           }
+          applyCalendarState(targetOnIds).then(() => loadGroupsToPage());
         });
       } else {
         loadGroupsToPage();
@@ -654,10 +668,13 @@ function setMessageListener() {
     } else if (message.action === 'getCalendars') {
       getAllCalendarsFromCacheAndDOM().then((calendars) => sendResponse({ calendars }));
     } else if (message.action === 'activateGroup') {
-      activateGroup(message.groupName, message.calendarIds);
+      activateGroup(message.groupName);
       sendResponse({ success: true });
     } else if (message.action === 'deactivateGroup') {
-      deactivateGroup();
+      deactivateGroup(message.groupName);
+      sendResponse({ success: true });
+    } else if (message.action === 'resetAllGroups') {
+      resetAllGroups();
       sendResponse({ success: true });
     } else if (message.action === 'refreshGroupList') {
       loadGroupsToPage();
@@ -680,6 +697,15 @@ function setStorageListener() {
         insertGroupSection();
         loadGroupsToPage();
       }
+      if ('multiGroupMode' in changes) {
+        const panel = document.getElementById('group-settings-panel');
+        if (panel) {
+          const isMulti = !!changes.multiGroupMode.newValue;
+          panel.querySelectorAll('input[name="group-mode"]').forEach((r) => {
+            r.checked = r.value === (isMulti ? 'multi' : 'single');
+          });
+        }
+      }
     });
   } catch { /* invalidated */ }
 }
@@ -687,7 +713,7 @@ function setStorageListener() {
 function initialize() {
   if (window.__calendarGroupingInitialized) return;
   window.__calendarGroupingInitialized = true;
-  getCurrentSelectedGroup();
+  initActiveGroups();
   observeNavPanel();
   setMessageListener();
   setStorageListener();
