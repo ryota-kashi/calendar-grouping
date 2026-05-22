@@ -345,7 +345,8 @@ async function activateGroup(groupName) {
       }),
     ]);
 
-    let newActive = [...activeGroups];
+    // インメモリが空の場合はストレージを一次ソースとして使う（リロード直後の初回呼び出し対策）
+    let newActive = activeGroups.length > 0 ? [...activeGroups] : (stored.activeGroups || []);
     let originalState = stored.originalCalendarState || null;
 
     if (newActive.length === 0) {
@@ -380,18 +381,60 @@ async function activateGroup(groupName) {
 }
 
 async function deactivateGroup(groupName) {
-  if (!isChromeContextValid()) return;
-  const stored = await new Promise((resolve) => {
-    try {
-      chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
-    } catch { resolve({}); }
-  });
+  if (!isChromeContextValid() || _activating) return;
+  _activating = true;
+  try {
+    const stored = await new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+      } catch { resolve({}); }
+    });
 
-  const newActive = activeGroups.filter((n) => n !== groupName);
-  const originalState = stored.originalCalendarState || {};
+    const newActive = activeGroups.filter((n) => n !== groupName);
+    const originalState = stored.originalCalendarState || {};
 
-  if (newActive.length === 0) {
-    await restoreOriginalState(originalState);
+    if (newActive.length === 0) {
+      await restoreOriginalState(originalState);
+      activeGroups = [];
+      try {
+        chrome.storage.local.remove(
+          ['activeGroups', 'originalCalendarState'],
+          () => { loadGroupsToPage(); }
+        );
+      } catch { /* invalidated */ }
+    } else {
+      const groups = await getStoredGroups();
+      const targetOnIds = new Set();
+      for (const name of newActive) {
+        for (const cal of (groups[name] || [])) {
+          targetOnIds.add(cal.id);
+        }
+      }
+      await applyCalendarState(targetOnIds);
+      activeGroups = newActive;
+      try {
+        chrome.storage.local.set(
+          { activeGroups: newActive },
+          () => { loadGroupsToPage(); }
+        );
+      } catch { /* invalidated */ }
+    }
+  } finally {
+    _activating = false;
+  }
+}
+
+async function resetAllGroups() {
+  if (!isChromeContextValid() || _activating) return;
+  _activating = true;
+  try {
+    const stored = await new Promise((resolve) => {
+      try {
+        chrome.storage.local.get('originalCalendarState', (r) => resolve(r));
+      } catch { resolve({}); }
+    });
+
+    await restoreOriginalState(stored.originalCalendarState || {});
     activeGroups = [];
     try {
       chrome.storage.local.remove(
@@ -399,41 +442,9 @@ async function deactivateGroup(groupName) {
         () => { loadGroupsToPage(); }
       );
     } catch { /* invalidated */ }
-  } else {
-    const groups = await getStoredGroups();
-    const targetOnIds = new Set();
-    for (const name of newActive) {
-      for (const cal of (groups[name] || [])) {
-        targetOnIds.add(cal.id);
-      }
-    }
-    await applyCalendarState(targetOnIds);
-    activeGroups = newActive;
-    try {
-      chrome.storage.local.set(
-        { activeGroups: newActive },
-        () => { loadGroupsToPage(); }
-      );
-    } catch { /* invalidated */ }
+  } finally {
+    _activating = false;
   }
-}
-
-async function resetAllGroups() {
-  if (!isChromeContextValid()) return;
-  const stored = await new Promise((resolve) => {
-    try {
-      chrome.storage.local.get('originalCalendarState', (r) => resolve(r));
-    } catch { resolve({}); }
-  });
-
-  await restoreOriginalState(stored.originalCalendarState || {});
-  activeGroups = [];
-  try {
-    chrome.storage.local.remove(
-      ['activeGroups', 'originalCalendarState'],
-      () => { loadGroupsToPage(); }
-    );
-  } catch { /* invalidated */ }
 }
 
 const GROUP_SECTION_VERSION = '4';
