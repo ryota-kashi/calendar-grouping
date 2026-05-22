@@ -157,6 +157,17 @@ function getStoredOrder() {
   });
 }
 
+function getStoredMultiGroupMode() {
+  return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve(false); return; }
+    try {
+      chrome.storage.local.get('multiGroupMode', (result) => {
+        resolve(!!result.multiGroupMode);
+      });
+    } catch { resolve(false); }
+  });
+}
+
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
     if (!isChromeContextValid()) { resolve({}); return; }
@@ -244,7 +255,7 @@ function initCalendarCache() {
   observeCalendarDOMChanges();
 }
 
-let currentSelectedGroupName = null;
+let activeGroups = [];
 
 async function scrollToReveal(id) {
   const scrollEl = getNavScrollable();
@@ -290,57 +301,131 @@ async function setCalendarOff(id) {
   return true;
 }
 
-async function activateGroup(groupName, calendarIds) {
-  const groupIdSet = new Set(calendarIds);
-
-  // スクロールして全カレンダーを収集してから非活性化（仮想スクロール対応）
-  const deactivated = [];
+async function captureCurrentCalendarState() {
+  const state = {};
   for (const cal of await scrollAndCollectCalendars()) {
-    if (!groupIdSet.has(cal.id) && isCalendarOn(cal.id)) {
+    state[cal.id] = isCalendarOn(cal.id);
+  }
+  return state;
+}
+
+async function applyCalendarState(targetOnIds) {
+  for (const cal of await scrollAndCollectCalendars()) {
+    if (targetOnIds.has(cal.id)) {
+      await setCalendarOn(cal.id);
+    } else {
       await setCalendarOff(cal.id);
-      deactivated.push(cal.id);
     }
   }
+}
 
-  const activated = [];
-  for (const id of calendarIds) {
-    if (!isCalendarOn(id)) {
+async function restoreOriginalState(originalCalendarState) {
+  for (const [id, wasOn] of Object.entries(originalCalendarState)) {
+    if (wasOn) {
       await setCalendarOn(id);
-      activated.push(id);
+    } else {
+      await setCalendarOff(id);
+    }
+  }
+}
+
+async function activateGroup(groupName) {
+  if (!isChromeContextValid()) return;
+  const [groups, isMulti, stored] = await Promise.all([
+    getStoredGroups(),
+    getStoredMultiGroupMode(),
+    new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+      } catch { resolve({}); }
+    }),
+  ]);
+
+  let newActive = stored.activeGroups || [];
+  let originalState = stored.originalCalendarState || null;
+
+  if (newActive.length === 0) {
+    originalState = await captureCurrentCalendarState();
+  }
+
+  if (isMulti) {
+    if (!newActive.includes(groupName)) newActive = [...newActive, groupName];
+  } else {
+    newActive = [groupName];
+  }
+
+  const targetOnIds = new Set();
+  for (const name of newActive) {
+    for (const cal of (groups[name] || [])) {
+      targetOnIds.add(cal.id);
     }
   }
 
-  currentSelectedGroupName = groupName;
-  if (!isChromeContextValid()) return;
+  await applyCalendarState(targetOnIds);
+  activeGroups = newActive;
+
   try {
     chrome.storage.local.set(
-      {
-        currentSelectedGroup: groupName,
-        activatedCalendarIds: activated,
-        deactivatedCalendarIds: deactivated,
-      },
+      { activeGroups: newActive, originalCalendarState: originalState },
       () => { loadGroupsToPage(); }
     );
   } catch { /* invalidated */ }
 }
 
-function deactivateGroup() {
+async function deactivateGroup(groupName) {
   if (!isChromeContextValid()) return;
+  const stored = await new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+    } catch { resolve({}); }
+  });
+
+  const newActive = (stored.activeGroups || []).filter((n) => n !== groupName);
+  const originalState = stored.originalCalendarState || {};
+
+  if (newActive.length === 0) {
+    await restoreOriginalState(originalState);
+    activeGroups = [];
+    try {
+      chrome.storage.local.remove(
+        ['activeGroups', 'originalCalendarState'],
+        () => { loadGroupsToPage(); }
+      );
+    } catch { /* invalidated */ }
+  } else {
+    const groups = await getStoredGroups();
+    const targetOnIds = new Set();
+    for (const name of newActive) {
+      for (const cal of (groups[name] || [])) {
+        targetOnIds.add(cal.id);
+      }
+    }
+    await applyCalendarState(targetOnIds);
+    activeGroups = newActive;
+    try {
+      chrome.storage.local.set(
+        { activeGroups: newActive },
+        () => { loadGroupsToPage(); }
+      );
+    } catch { /* invalidated */ }
+  }
+}
+
+async function resetAllGroups() {
+  if (!isChromeContextValid()) return;
+  const stored = await new Promise((resolve) => {
+    try {
+      chrome.storage.local.get('originalCalendarState', (r) => resolve(r));
+    } catch { resolve({}); }
+  });
+
+  await restoreOriginalState(stored.originalCalendarState || {});
+  activeGroups = [];
   try {
-    chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
-      const activated = result.activatedCalendarIds || [];
-      const deactivated = result.deactivatedCalendarIds || [];
-      for (const id of activated) await setCalendarOff(id);
-      for (const id of deactivated) await setCalendarOn(id);
-      currentSelectedGroupName = null;
-      if (!isChromeContextValid()) return;
-      try {
-        chrome.storage.local.remove(
-          ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
-          () => { loadGroupsToPage(); }
-        );
-      } catch { /* invalidated */ }
-    });
+    chrome.storage.local.remove(
+      ['activeGroups', 'originalCalendarState'],
+      () => { loadGroupsToPage(); }
+    );
   } catch { /* invalidated */ }
 }
 
