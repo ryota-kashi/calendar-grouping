@@ -380,7 +380,7 @@ async function deactivateGroup(groupName) {
     } catch { resolve({}); }
   });
 
-  const newActive = (stored.activeGroups || []).filter((n) => n !== groupName);
+  const newActive = activeGroups.filter((n) => n !== groupName);
   const originalState = stored.originalCalendarState || {};
 
   if (newActive.length === 0) {
