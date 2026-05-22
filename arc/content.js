@@ -521,12 +521,30 @@ function insertGroupSection() {
   });
 
   const gearBtn = btn.querySelector('.group-gear-btn');
+
+  const closeSettingsPanel = () => {
+    settingsPanel.style.display = 'none';
+    gearBtn.style.background = '';
+    gearBtn.style.color = '';
+  };
+
   gearBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const isOpen = settingsPanel.style.display !== 'none';
-    settingsPanel.style.display = isOpen ? 'none' : 'block';
-    gearBtn.style.background = isOpen ? '' : 'rgba(26,115,232,0.12)';
-    gearBtn.style.color = isOpen ? '' : '#1a73e8';
+    if (isOpen) {
+      closeSettingsPanel();
+    } else {
+      settingsPanel.style.display = 'block';
+      gearBtn.style.background = 'rgba(26,115,232,0.12)';
+      gearBtn.style.color = '#1a73e8';
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (settingsPanel.style.display === 'none') return;
+    if (!settingsPanel.contains(e.target) && e.target !== gearBtn) {
+      closeSettingsPanel();
+    }
   });
 
   settingsPanel.querySelectorAll('input[name="group-mode"]').forEach((radio) => {
