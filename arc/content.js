@@ -390,7 +390,8 @@ async function deactivateGroup(groupName) {
       } catch { resolve({}); }
     });
 
-    const newActive = activeGroups.filter((n) => n !== groupName);
+    const base = activeGroups.length > 0 ? activeGroups : (stored.activeGroups || []);
+    const newActive = base.filter((n) => n !== groupName);
     const originalState = stored.originalCalendarState || {};
 
     if (newActive.length === 0) {
@@ -561,7 +562,7 @@ function insertGroupSection() {
   if (_docClickHandler) document.removeEventListener('click', _docClickHandler);
   _docClickHandler = (e) => {
     if (settingsPanel.style.display === 'none') return;
-    if (!settingsPanel.contains(e.target) && e.target !== gearBtn) {
+    if (!settingsPanel.contains(e.target) && !gearBtn.contains(e.target)) {
       closeSettingsPanel();
     }
   };
@@ -676,27 +677,33 @@ function observeNavPanel() {
   insertGroupSection();
 }
 
-function initActiveGroups() {
-  if (!isChromeContextValid()) return;
+async function initActiveGroups() {
+  if (!isChromeContextValid() || _activating) return;
+  _activating = true;
   try {
-    chrome.storage.local.get('activeGroups', (result) => {
-      const storedActive = result.activeGroups || [];
-      activeGroups = storedActive;
-      if (storedActive.length > 0) {
-        getStoredGroups().then((groups) => {
-          const targetOnIds = new Set();
-          for (const name of activeGroups) {
-            for (const cal of (groups[name] || [])) {
-              targetOnIds.add(cal.id);
-            }
-          }
-          applyCalendarState(targetOnIds).then(() => loadGroupsToPage());
-        });
-      } else {
-        loadGroupsToPage();
-      }
+    const result = await new Promise((resolve) => {
+      try {
+        chrome.storage.local.get('activeGroups', resolve);
+      } catch { resolve({}); }
     });
-  } catch { /* invalidated */ }
+    const storedActive = result.activeGroups || [];
+    activeGroups = storedActive;
+    if (storedActive.length > 0) {
+      const groups = await getStoredGroups();
+      const targetOnIds = new Set();
+      for (const name of activeGroups) {
+        for (const cal of (groups[name] || [])) {
+          targetOnIds.add(cal.id);
+        }
+      }
+      await applyCalendarState(targetOnIds);
+      loadGroupsToPage();
+    } else {
+      loadGroupsToPage();
+    }
+  } finally {
+    _activating = false;
+  }
 }
 
 function setMessageListener() {
