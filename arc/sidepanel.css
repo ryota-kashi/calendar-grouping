@@ -543,3 +543,59 @@ body {
   color: var(--danger);
   background: var(--danger-bg);
 }
+
+/* ===== モード切り替え行 ===== */
+.sp-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px 12px;
+}
+
+.sp-mode-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sp-toggle {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.sp-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sp-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #30363d;
+  border-radius: 22px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sp-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.sp-toggle input:checked + .sp-toggle-slider {
+  background: var(--accent);
+}
+
+.sp-toggle input:checked + .sp-toggle-slider::before {
+  transform: translateX(16px);
+}

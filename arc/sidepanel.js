@@ -321,12 +321,29 @@ function saveForm() {
   });
 }
 
+// ===== モード切り替えトグル =====
+
+function initMultiGroupToggle() {
+  const toggle = document.getElementById('multiGroupToggle');
+  if (!toggle) return;
+  chrome.storage.local.get('multiGroupMode', (r) => {
+    toggle.checked = !!r.multiGroupMode;
+  });
+  toggle.addEventListener('change', () => {
+    chrome.storage.local.set({ multiGroupMode: toggle.checked });
+  });
+}
+
 // ===== ストレージ変更を監視して他UIと同期 =====
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if ('calendarGroups' in changes || 'calendarGroupsOrder' in changes) {
     loadGroups();
+  }
+  if ('multiGroupMode' in changes) {
+    const toggle = document.getElementById('multiGroupToggle');
+    if (toggle) toggle.checked = !!changes.multiGroupMode.newValue;
   }
 });
 
@@ -335,6 +352,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 document.addEventListener('DOMContentLoaded', () => {
   loadGroups();
   loadCalendars();
+  initMultiGroupToggle();
 
   document.getElementById('createGroupBtn').addEventListener('click', () => showForm());
   document.getElementById('refreshBtn').addEventListener('click', loadCalendars);
