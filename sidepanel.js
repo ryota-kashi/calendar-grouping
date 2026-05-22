@@ -328,6 +328,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ('calendarGroups' in changes || 'calendarGroupsOrder' in changes) {
     loadGroups();
   }
+  if ('multiGroupMode' in changes) {
+    const toggle = document.getElementById('multiGroupToggle');
+    if (toggle) toggle.checked = !!changes.multiGroupMode.newValue;
+  }
 });
 
 // ===== 初期化 =====
@@ -346,5 +350,14 @@ document.addEventListener('DOMContentLoaded', () => {
     sendToContentScript({ action: 'clearCache' })
       .then(loadCalendars)
       .catch(() => alert('失敗しました。Googleカレンダーを開いてください。'));
+  });
+
+  chrome.storage.local.get('multiGroupMode', (result) => {
+    const toggle = document.getElementById('multiGroupToggle');
+    if (toggle) toggle.checked = !!result.multiGroupMode;
+  });
+
+  document.getElementById('multiGroupToggle').addEventListener('change', (e) => {
+    chrome.storage.local.set({ multiGroupMode: e.target.checked });
   });
 });
