@@ -157,6 +157,17 @@ function getStoredOrder() {
   });
 }
 
+function getStoredMultiGroupMode() {
+  return new Promise((resolve) => {
+    if (!isChromeContextValid()) { resolve(false); return; }
+    try {
+      chrome.storage.local.get('multiGroupMode', (result) => {
+        resolve(!!result.multiGroupMode);
+      });
+    } catch { resolve(false); }
+  });
+}
+
 function getStoredCalendarCache() {
   return new Promise((resolve) => {
     if (!isChromeContextValid()) { resolve({}); return; }
@@ -244,7 +255,7 @@ function initCalendarCache() {
   observeCalendarDOMChanges();
 }
 
-let currentSelectedGroupName = null;
+let activeGroups = [];
 
 async function scrollToReveal(id) {
   const scrollEl = getNavScrollable();
@@ -290,61 +301,135 @@ async function setCalendarOff(id) {
   return true;
 }
 
-async function activateGroup(groupName, calendarIds) {
-  const groupIdSet = new Set(calendarIds);
-
-  // スクロールして全カレンダーを収集してから非活性化（仮想スクロール対応）
-  const deactivated = [];
+async function captureCurrentCalendarState() {
+  const state = {};
   for (const cal of await scrollAndCollectCalendars()) {
-    if (!groupIdSet.has(cal.id) && isCalendarOn(cal.id)) {
+    state[cal.id] = isCalendarOn(cal.id);
+  }
+  return state;
+}
+
+async function applyCalendarState(targetOnIds) {
+  for (const cal of await scrollAndCollectCalendars()) {
+    if (targetOnIds.has(cal.id)) {
+      await setCalendarOn(cal.id);
+    } else {
       await setCalendarOff(cal.id);
-      deactivated.push(cal.id);
     }
   }
+}
 
-  const activated = [];
-  for (const id of calendarIds) {
-    if (!isCalendarOn(id)) {
+async function restoreOriginalState(originalCalendarState) {
+  for (const [id, wasOn] of Object.entries(originalCalendarState)) {
+    if (wasOn) {
       await setCalendarOn(id);
-      activated.push(id);
+    } else {
+      await setCalendarOff(id);
+    }
+  }
+}
+
+async function activateGroup(groupName) {
+  if (!isChromeContextValid()) return;
+  const [groups, isMulti, stored] = await Promise.all([
+    getStoredGroups(),
+    getStoredMultiGroupMode(),
+    new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+      } catch { resolve({}); }
+    }),
+  ]);
+
+  let newActive = [...activeGroups];
+  let originalState = stored.originalCalendarState || null;
+
+  if (newActive.length === 0) {
+    originalState = await captureCurrentCalendarState();
+  }
+
+  if (isMulti) {
+    if (!newActive.includes(groupName)) newActive = [...newActive, groupName];
+  } else {
+    newActive = [groupName];
+  }
+
+  const targetOnIds = new Set();
+  for (const name of newActive) {
+    for (const cal of (groups[name] || [])) {
+      targetOnIds.add(cal.id);
     }
   }
 
-  currentSelectedGroupName = groupName;
-  if (!isChromeContextValid()) return;
+  await applyCalendarState(targetOnIds);
+  activeGroups = newActive;
+
   try {
     chrome.storage.local.set(
-      {
-        currentSelectedGroup: groupName,
-        activatedCalendarIds: activated,
-        deactivatedCalendarIds: deactivated,
-      },
+      { activeGroups: newActive, originalCalendarState: originalState },
       () => { loadGroupsToPage(); }
     );
   } catch { /* invalidated */ }
 }
 
-function deactivateGroup() {
+async function deactivateGroup(groupName) {
   if (!isChromeContextValid()) return;
+  const stored = await new Promise((resolve) => {
+    try {
+      chrome.storage.local.get(['activeGroups', 'originalCalendarState'], (r) => resolve(r));
+    } catch { resolve({}); }
+  });
+
+  const newActive = activeGroups.filter((n) => n !== groupName);
+  const originalState = stored.originalCalendarState || {};
+
+  if (newActive.length === 0) {
+    await restoreOriginalState(originalState);
+    activeGroups = [];
+    try {
+      chrome.storage.local.remove(
+        ['activeGroups', 'originalCalendarState'],
+        () => { loadGroupsToPage(); }
+      );
+    } catch { /* invalidated */ }
+  } else {
+    const groups = await getStoredGroups();
+    const targetOnIds = new Set();
+    for (const name of newActive) {
+      for (const cal of (groups[name] || [])) {
+        targetOnIds.add(cal.id);
+      }
+    }
+    await applyCalendarState(targetOnIds);
+    activeGroups = newActive;
+    try {
+      chrome.storage.local.set(
+        { activeGroups: newActive },
+        () => { loadGroupsToPage(); }
+      );
+    } catch { /* invalidated */ }
+  }
+}
+
+async function resetAllGroups() {
+  if (!isChromeContextValid()) return;
+  const stored = await new Promise((resolve) => {
+    try {
+      chrome.storage.local.get('originalCalendarState', (r) => resolve(r));
+    } catch { resolve({}); }
+  });
+
+  await restoreOriginalState(stored.originalCalendarState || {});
+  activeGroups = [];
   try {
-    chrome.storage.local.get(['activatedCalendarIds', 'deactivatedCalendarIds'], async (result) => {
-      const activated = result.activatedCalendarIds || [];
-      const deactivated = result.deactivatedCalendarIds || [];
-      for (const id of activated) await setCalendarOff(id);
-      for (const id of deactivated) await setCalendarOn(id);
-      currentSelectedGroupName = null;
-      if (!isChromeContextValid()) return;
-      try {
-        chrome.storage.local.remove(
-          ['currentSelectedGroup', 'activatedCalendarIds', 'deactivatedCalendarIds'],
-          () => { loadGroupsToPage(); }
-        );
-      } catch { /* invalidated */ }
-    });
+    chrome.storage.local.remove(
+      ['activeGroups', 'originalCalendarState'],
+      () => { loadGroupsToPage(); }
+    );
   } catch { /* invalidated */ }
 }
 
-const GROUP_SECTION_VERSION = '3';
+const GROUP_SECTION_VERSION = '4';
 
 function insertGroupSection() {
   const existing = document.querySelector('#custom-group-section');
@@ -384,8 +469,34 @@ function insertGroupSection() {
     <div class="x5FT4e kkUTBb" style="width:100%;">
       <div class="o8t45d" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
         <div class="aIwHYe">${sectionName}</div>
-        <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true" style="margin-right:12px;">keyboard_arrow_up</i>
+        <div style="display:flex;align-items:center;">
+          <button type="button" class="group-gear-btn" title="グループ選択モード設定" style="border:none;background:none;cursor:pointer;padding:4px;border-radius:4px;color:#5f6368;display:flex;align-items:center;font-size:16px;line-height:1;margin-right:2px;">⚙</button>
+          <i class="google-material-icons meh4fc hggPq Dk9A5d" aria-hidden="true" style="margin-right:12px;">keyboard_arrow_up</i>
+        </div>
       </div>
+    </div>
+  `;
+
+  const settingsPanel = document.createElement('div');
+  settingsPanel.id = 'group-settings-panel';
+  settingsPanel.style.display = 'none';
+  settingsPanel.innerHTML = `
+    <div class="group-settings-inner">
+      <div class="group-settings-title">グループ選択モード</div>
+      <label class="group-settings-label">
+        <input type="radio" name="group-mode" value="single">
+        <div>
+          <div class="group-settings-mode-name">切り替えモード</div>
+          <div class="group-settings-mode-desc">1つのグループのみON</div>
+        </div>
+      </label>
+      <label class="group-settings-label">
+        <input type="radio" name="group-mode" value="multi">
+        <div>
+          <div class="group-settings-mode-name">複数選択モード</div>
+          <div class="group-settings-mode-desc">複数グループを同時にON可能</div>
+        </div>
+      </label>
     </div>
   `;
 
@@ -398,6 +509,9 @@ function insertGroupSection() {
   list.id = 'group-list';
   container.appendChild(list);
 
+  const resetContainer = document.createElement('div');
+  resetContainer.id = 'group-reset-container';
+
   btn.addEventListener('click', () => {
     const expanded = btn.getAttribute('aria-expanded') === 'true';
     btn.setAttribute('aria-expanded', String(!expanded));
@@ -406,9 +520,36 @@ function insertGroupSection() {
     container.style.display = expanded ? 'none' : 'block';
   });
 
+  const gearBtn = btn.querySelector('.group-gear-btn');
+  gearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = settingsPanel.style.display !== 'none';
+    settingsPanel.style.display = isOpen ? 'none' : 'block';
+    gearBtn.style.background = isOpen ? '' : 'rgba(26,115,232,0.12)';
+    gearBtn.style.color = isOpen ? '' : '#1a73e8';
+  });
+
+  settingsPanel.querySelectorAll('input[name="group-mode"]').forEach((radio) => {
+    radio.addEventListener('change', () => {
+      if (!isChromeContextValid()) return;
+      const isMulti = radio.value === 'multi';
+      try {
+        chrome.storage.local.set({ multiGroupMode: isMulti });
+      } catch { /* invalidated */ }
+    });
+  });
+
   section.appendChild(btn);
+  section.appendChild(settingsPanel);
   section.appendChild(container);
+  section.appendChild(resetContainer);
   targetH2.insertAdjacentElement('afterend', section);
+
+  getStoredMultiGroupMode().then((isMulti) => {
+    settingsPanel.querySelectorAll('input[name="group-mode"]').forEach((r) => {
+      r.checked = r.value === (isMulti ? 'multi' : 'single');
+    });
+  });
 
   loadGroupsToPage();
 }
@@ -416,6 +557,7 @@ function insertGroupSection() {
 function loadGroupsToPage() {
   Promise.all([getStoredGroups(), getStoredOrder()]).then(([groups, order]) => {
     const list = document.getElementById('group-list');
+    const resetContainer = document.getElementById('group-reset-container');
     if (!list) return;
 
     list.style.visibility = 'hidden';
@@ -429,7 +571,7 @@ function loadGroupsToPage() {
 
     for (const groupName of sorted) {
       const color = getRandomColorForGroup(groupName);
-      const isActive = groupName === currentSelectedGroupName;
+      const isActive = activeGroups.includes(groupName);
 
       const item = document.createElement('li');
       item.classList.add('group-item-row');
@@ -451,10 +593,10 @@ function loadGroupsToPage() {
       span.style.cssText = 'flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
       item.addEventListener('click', () => {
-        if (currentSelectedGroupName === groupName) {
-          deactivateGroup();
+        if (activeGroups.includes(groupName)) {
+          deactivateGroup(groupName);
         } else {
-          activateGroup(groupName, groups[groupName].map((c) => c.id));
+          activateGroup(groupName);
         }
       });
 
@@ -465,6 +607,18 @@ function loadGroupsToPage() {
     }
 
     list.style.visibility = 'visible';
+
+    if (resetContainer) {
+      resetContainer.innerHTML = '';
+      if (activeGroups.length > 0) {
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.classList.add('group-reset-btn');
+        resetBtn.textContent = 'すべてOFF';
+        resetBtn.addEventListener('click', () => resetAllGroups());
+        resetContainer.appendChild(resetBtn);
+      }
+    }
   });
 }
 
@@ -484,20 +638,21 @@ function observeNavPanel() {
   insertGroupSection();
 }
 
-function getCurrentSelectedGroup() {
+function initActiveGroups() {
   if (!isChromeContextValid()) return;
   try {
-    chrome.storage.local.get('currentSelectedGroup', (result) => {
-      currentSelectedGroupName = result.currentSelectedGroup || null;
-      if (currentSelectedGroupName) {
+    chrome.storage.local.get('activeGroups', (result) => {
+      const storedActive = result.activeGroups || [];
+      activeGroups = storedActive;
+      if (storedActive.length > 0) {
         getStoredGroups().then((groups) => {
-          const group = groups[currentSelectedGroupName];
-          if (group) {
-            activateGroup(currentSelectedGroupName, group.map((c) => c.id));
-          } else {
-            currentSelectedGroupName = null;
-            loadGroupsToPage();
+          const targetOnIds = new Set();
+          for (const name of activeGroups) {
+            for (const cal of (groups[name] || [])) {
+              targetOnIds.add(cal.id);
+            }
           }
+          applyCalendarState(targetOnIds).then(() => loadGroupsToPage());
         });
       } else {
         loadGroupsToPage();
@@ -513,10 +668,13 @@ function setMessageListener() {
     } else if (message.action === 'getCalendars') {
       getAllCalendarsFromCacheAndDOM().then((calendars) => sendResponse({ calendars }));
     } else if (message.action === 'activateGroup') {
-      activateGroup(message.groupName, message.calendarIds);
+      activateGroup(message.groupName);
       sendResponse({ success: true });
     } else if (message.action === 'deactivateGroup') {
-      deactivateGroup();
+      deactivateGroup(message.groupName);
+      sendResponse({ success: true });
+    } else if (message.action === 'resetAllGroups') {
+      resetAllGroups();
       sendResponse({ success: true });
     } else if (message.action === 'refreshGroupList') {
       loadGroupsToPage();
@@ -539,6 +697,15 @@ function setStorageListener() {
         insertGroupSection();
         loadGroupsToPage();
       }
+      if ('multiGroupMode' in changes) {
+        const panel = document.getElementById('group-settings-panel');
+        if (panel) {
+          const isMulti = !!changes.multiGroupMode.newValue;
+          panel.querySelectorAll('input[name="group-mode"]').forEach((r) => {
+            r.checked = r.value === (isMulti ? 'multi' : 'single');
+          });
+        }
+      }
     });
   } catch { /* invalidated */ }
 }
@@ -546,7 +713,7 @@ function setStorageListener() {
 function initialize() {
   if (window.__calendarGroupingInitialized) return;
   window.__calendarGroupingInitialized = true;
-  getCurrentSelectedGroup();
+  initActiveGroups();
   observeNavPanel();
   setMessageListener();
   setStorageListener();
