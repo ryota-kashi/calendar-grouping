@@ -257,7 +257,19 @@ function initCalendarCache() {
 
 let activeGroups = [];
 let _activating = false;
+let _activatingTimer = null;
 let _docClickHandler = null;
+
+// _activating を最大 timeoutMs 後に強制解放（フラグが詰まっても自動回復）
+function acquireActivating(timeoutMs = 25000) {
+  _activating = true;
+  clearTimeout(_activatingTimer);
+  _activatingTimer = setTimeout(() => { _activating = false; }, timeoutMs);
+}
+function releaseActivating() {
+  clearTimeout(_activatingTimer);
+  _activating = false;
+}
 
 async function scrollToReveal(id) {
   const scrollEl = getNavScrollable();
@@ -375,7 +387,7 @@ function setGroupListLoading(isLoading) {
 
 async function activateGroup(groupName) {
   if (!isChromeContextValid() || _activating) return;
-  _activating = true;
+  acquireActivating();
   setGroupListLoading(true);
   try {
     const [groups, isMulti, stored] = await Promise.all([
@@ -430,13 +442,13 @@ async function activateGroup(groupName) {
       );
     } catch { /* invalidated */ }
   } finally {
-    _activating = false;
+    releaseActivating();
   }
 }
 
 async function deactivateGroup(groupName) {
   if (!isChromeContextValid() || _activating) return;
-  _activating = true;
+  acquireActivating();
   setGroupListLoading(true);
   try {
     const [groups, stored] = await Promise.all([
@@ -489,13 +501,13 @@ async function deactivateGroup(groupName) {
       } catch { /* invalidated */ }
     }
   } finally {
-    _activating = false;
+    releaseActivating();
   }
 }
 
 async function resetAllGroups() {
   if (!isChromeContextValid() || _activating) return;
-  _activating = true;
+  acquireActivating();
   setGroupListLoading(true);
   try {
     const [groups, stored] = await Promise.all([
@@ -530,7 +542,7 @@ async function resetAllGroups() {
       );
     } catch { /* invalidated */ }
   } finally {
-    _activating = false;
+    releaseActivating();
   }
 }
 
@@ -767,7 +779,7 @@ function observeNavPanel() {
 
 async function initActiveGroups() {
   if (!isChromeContextValid() || _activating) return;
-  _activating = true;
+  acquireActivating();
   setGroupListLoading(true);
   try {
     const result = await new Promise((resolve) => {
@@ -811,7 +823,7 @@ async function initActiveGroups() {
       loadGroupsToPage();
     }
   } finally {
-    _activating = false;
+    releaseActivating();
   }
 }
 
