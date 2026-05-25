@@ -5,22 +5,25 @@ function isChromeContextValid() {
 }
 
 // ナビパネル内でスクロール可能なコンテナを取得
+// DOM に実在するカレンダー要素の祖先を辿って確実に特定する
 function getNavScrollable() {
-  const navPanel = document.querySelector('[jscontroller="TKuTKe"]') || document.body;
-  if (navPanel.scrollHeight > navPanel.clientHeight + 10) return navPanel;
-  function find(el, depth) {
-    if (depth === 0) return null;
-    for (const child of el.children) {
-      const oy = getComputedStyle(child).overflowY;
-      if ((oy === 'auto' || oy === 'scroll') && child.scrollHeight > child.clientHeight + 10) {
-        return child;
+  // DOM に存在するカレンダー要素から祖先を辿り、スクロール可能な最初の要素を返す
+  const anchor = document.querySelector('div[jscontroller="rHQf4"][data-id]')
+    || document.querySelector('div[data-id] input[type="checkbox"]')?.closest('[data-id]');
+  if (anchor) {
+    let el = anchor.parentElement;
+    while (el && el !== document.documentElement) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 10) {
+        return el;
       }
-      const found = find(child, depth - 1);
-      if (found) return found;
+      el = el.parentElement;
     }
-    return null;
   }
-  return find(navPanel, 5) || navPanel;
+  // フォールバック: 旧セレクタ
+  const legacy = document.querySelector('[jscontroller="TKuTKe"]');
+  if (legacy && legacy.scrollHeight > legacy.clientHeight + 10) return legacy;
+  return document.documentElement;
 }
 
 // ナビパネルを上から下までスクロールして全カレンダーを収集し元の位置に戻す
@@ -292,10 +295,14 @@ async function scrollToReveal(id) {
   const saved = scrollEl.scrollTop;
   scrollEl.scrollTop = 0;
   await sleep(150);
+  let prevTop = -1;
   while (true) {
     const el = findCalendarItemById(id);
     if (el) return el;
     if (scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 5) break;
+    // スクロール位置が変わらない場合は誤ったコンテナと判断して中断
+    if (scrollEl.scrollTop === prevTop) break;
+    prevTop = scrollEl.scrollTop;
     scrollEl.scrollTop += 150;
     await sleep(150);
   }
