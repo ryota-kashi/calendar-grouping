@@ -258,17 +258,33 @@ function initCalendarCache() {
 let activeGroups = [];
 let _activating = false;
 let _activatingTimer = null;
+let _pendingAction = null;
 let _docClickHandler = null;
 
 // _activating を最大 timeoutMs 後に強制解放（フラグが詰まっても自動回復）
 function acquireActivating(timeoutMs = 25000) {
   _activating = true;
   clearTimeout(_activatingTimer);
-  _activatingTimer = setTimeout(() => { _activating = false; }, timeoutMs);
+  _activatingTimer = setTimeout(() => {
+    _activating = false;
+    _drainPending();
+  }, timeoutMs);
 }
 function releaseActivating() {
   clearTimeout(_activatingTimer);
   _activating = false;
+  _drainPending();
+}
+function _drainPending() {
+  if (!_pendingAction) return;
+  const fn = _pendingAction;
+  _pendingAction = null;
+  setTimeout(fn, 0);
+}
+// _activating 中は fn をキューに積み、解放後に自動実行する（最後のリクエストのみ保持）
+function deferIfBusy(fn) {
+  if (!_activating) { fn(); return; }
+  _pendingAction = fn;
 }
 
 async function scrollToReveal(id) {
@@ -732,11 +748,14 @@ function loadGroupsToPage() {
       span.style.cssText = 'flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
       item.addEventListener('click', () => {
-        if (activeGroups.includes(groupName)) {
-          deactivateGroup(groupName);
-        } else {
-          activateGroup(groupName);
-        }
+        const name = groupName;
+        deferIfBusy(() => {
+          if (activeGroups.includes(name)) {
+            deactivateGroup(name);
+          } else {
+            activateGroup(name);
+          }
+        });
       });
 
       item.appendChild(checkbox);
@@ -754,7 +773,7 @@ function loadGroupsToPage() {
         resetBtn.type = 'button';
         resetBtn.classList.add('group-reset-btn');
         resetBtn.textContent = 'すべてOFF';
-        resetBtn.addEventListener('click', () => resetAllGroups());
+        resetBtn.addEventListener('click', () => deferIfBusy(() => resetAllGroups()));
         resetContainer.appendChild(resetBtn);
       }
     }
@@ -834,13 +853,13 @@ function setMessageListener() {
     } else if (message.action === 'getCalendars') {
       getAllCalendarsFromCacheAndDOM().then((calendars) => sendResponse({ calendars }));
     } else if (message.action === 'activateGroup') {
-      activateGroup(message.groupName);
+      deferIfBusy(() => activateGroup(message.groupName));
       sendResponse({ success: true });
     } else if (message.action === 'deactivateGroup') {
-      deactivateGroup(message.groupName);
+      deferIfBusy(() => deactivateGroup(message.groupName));
       sendResponse({ success: true });
     } else if (message.action === 'resetAllGroups') {
-      resetAllGroups();
+      deferIfBusy(() => resetAllGroups());
       sendResponse({ success: true });
     } else if (message.action === 'refreshGroupList') {
       loadGroupsToPage();
